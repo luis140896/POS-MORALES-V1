@@ -1,0 +1,509 @@
+import { useState, useEffect } from 'react'
+import { Plus, Search, Edit2, Trash2, Filter, X, Loader2, Image } from 'lucide-react'
+import toast from 'react-hot-toast'
+import Button from '@/shared/components/ui/Button'
+import Input from '@/shared/components/ui/Input'
+import { productService } from '@/core/api/productService'
+import { categoryService } from '@/core/api/categoryService'
+import { inventoryService } from '@/core/api/inventoryService'
+import { Product, Category } from '@/types'
+
+interface ProductFormData {
+  code: string
+  barcode: string
+  name: string
+  description: string
+  categoryId: number | ''
+  costPrice: number | ''
+  salePrice: number | ''
+  unit: string
+  taxRate: number
+  isActive: boolean
+  initialStock: number
+  minStock: number
+  maxStock: number
+  imageUrl: string
+}
+
+const initialFormData: ProductFormData = {
+  code: '',
+  barcode: '',
+  name: '',
+  description: '',
+  categoryId: '',
+  costPrice: '',
+  salePrice: '',
+  unit: 'UND',
+  taxRate: 0,
+  isActive: true,
+  initialStock: 0,
+  minStock: 0,
+  maxStock: 999999,
+  imageUrl: ''
+}
+
+const ProductsPage = () => {
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [formData, setFormData] = useState<ProductFormData>(initialFormData)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const normalizeProduct = (p: any): Product => {
+    const categoryId = p?.category?.id ?? p?.categoryId
+    const categoryName = p?.category?.name ?? p?.categoryName
+    const stockQuantity = p?.inventory?.quantity ?? p?.stockQuantity
+    const minStock = p?.inventory?.minStock ?? p?.minStock
+    const maxStock = p?.inventory?.maxStock ?? p?.maxStock
+    const location = p?.inventory?.location ?? p?.location
+
+    const inventory = (stockQuantity !== undefined || minStock !== undefined || maxStock !== undefined || location !== undefined)
+      ? {
+          quantity: Number(stockQuantity ?? 0),
+          minStock: Number(minStock ?? 0),
+          maxStock: Number(maxStock ?? 999999),
+          location: location,
+        }
+      : undefined
+
+    return {
+      ...(p as Product),
+      categoryId: Number(categoryId ?? 0),
+      category: categoryId ? ({ id: Number(categoryId), name: categoryName ?? '' } as any) : undefined,
+      inventory: inventory as any,
+    }
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        searchProducts()
+      } else {
+        fetchProducts()
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const [productsRes, categoriesRes] = await Promise.all([
+        productService.getAll(),
+        categoryService.getActive()
+      ])
+      const list = (productsRes as any).content || productsRes
+      setProducts((list as any[]).map(normalizeProduct))
+      setCategories(categoriesRes as Category[])
+    } catch (error) {
+      console.error('Error loading data:', error)
+      toast.error('Error al cargar productos')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchProducts = async () => {
+    try {
+      const res = await productService.getAll()
+      const list = (res as any).content || res
+      setProducts((list as any[]).map(normalizeProduct))
+    } catch (error) {
+      console.error('Error loading products:', error)
+    }
+  }
+
+  const searchProducts = async () => {
+    try {
+      const res = await productService.search(searchTerm)
+      setProducts((res as any[]).map(normalizeProduct))
+    } catch (error) {
+      console.error('Error searching products:', error)
+    }
+  }
+
+  const formatCurrency = (value: number) => 
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
+
+  const getStockBadge = (product: Product) => {
+    const qty = product.inventory?.quantity || 0
+    const min = product.inventory?.minStock || 10
+    if (qty === 0) return <span className="badge badge-danger">Sin stock</span>
+    if (qty <= min) return <span className="badge badge-warning">Stock bajo</span>
+    return <span className="badge badge-success">En stock</span>
+  }
+
+  const openNewProduct = () => {
+    setSelectedProduct(null)
+    setFormData(initialFormData)
+    setShowModal(true)
+  }
+
+  const openEditProduct = (product: Product) => {
+    setSelectedProduct(product)
+    setFormData({
+      code: product.code,
+      barcode: product.barcode || '',
+      name: product.name,
+      description: product.description || '',
+      categoryId: (product.category?.id ?? (product as any).categoryId) || '',
+      costPrice: product.costPrice,
+      salePrice: product.salePrice,
+      unit: product.unit || 'UND',
+      taxRate: product.taxRate || 0,
+      isActive: product.isActive,
+      initialStock: product.inventory?.quantity || 0,
+      minStock: product.inventory?.minStock || 0,
+      maxStock: product.inventory?.maxStock || 999999,
+      imageUrl: product.imageUrl || ''
+    })
+    setShowModal(true)
+  }
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`¿Eliminar el producto "${product.name}"?`)) return
+    
+    try {
+      await productService.delete(product.id)
+      toast.success('Producto eliminado')
+      fetchProducts()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al eliminar producto')
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+
+    try {
+      // Validar que categoryId sea válido
+      if (!formData.categoryId) {
+        toast.error('Debe seleccionar una categoría')
+        setSaving(false)
+        return
+      }
+
+      const categoryIdNum = Number(formData.categoryId)
+      
+      if (selectedProduct) {
+        // Para actualización, enviar solo los campos que el backend espera
+        const updateData = {
+          code: formData.code,
+          barcode: formData.barcode || undefined,
+          name: formData.name,
+          description: formData.description || undefined,
+          categoryId: categoryIdNum,
+          imageUrl: formData.imageUrl || undefined,
+          costPrice: Number(formData.costPrice),
+          salePrice: Number(formData.salePrice),
+          unit: formData.unit,
+          taxRate: Number(formData.taxRate),
+          isActive: formData.isActive
+        }
+        await productService.update(selectedProduct.id, updateData)
+        
+        // Actualizar límites de stock si cambiaron
+        const currentMinStock = selectedProduct.inventory?.minStock || 0
+        const currentMaxStock = selectedProduct.inventory?.maxStock || 999999
+        if (formData.minStock !== currentMinStock || formData.maxStock !== currentMaxStock) {
+          await inventoryService.updateLimits(
+            selectedProduct.id,
+            Number(formData.minStock),
+            Number(formData.maxStock)
+          )
+        }
+        toast.success('Producto actualizado')
+      } else {
+        // Para creación, incluir datos de stock inicial
+        const createData = {
+          code: formData.code,
+          barcode: formData.barcode || undefined,
+          name: formData.name,
+          description: formData.description || undefined,
+          categoryId: categoryIdNum,
+          imageUrl: formData.imageUrl || undefined,
+          costPrice: Number(formData.costPrice),
+          salePrice: Number(formData.salePrice),
+          unit: formData.unit,
+          taxRate: Number(formData.taxRate),
+          isActive: formData.isActive,
+          initialStock: Number(formData.initialStock),
+          minStock: Number(formData.minStock),
+          maxStock: Number(formData.maxStock)
+        }
+        await productService.create(createData)
+        toast.success('Producto creado')
+      }
+      
+      setShowModal(false)
+      fetchProducts()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al guardar producto')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Productos</h1>
+          <p className="text-gray-500">Gestiona tu catálogo de productos</p>
+        </div>
+        <Button variant="primary" onClick={openNewProduct}>
+          <Plus size={20} />
+          Nuevo Producto
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="card">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-field pl-12"
+            />
+          </div>
+          <Button variant="secondary">
+            <Filter size={20} />
+            Filtros
+          </Button>
+        </div>
+      </div>
+
+      {/* Products Table */}
+      <div className="card overflow-hidden p-0">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-gray-400">
+            No se encontraron productos
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="bg-primary-50">
+                <th className="table-header">Código</th>
+                <th className="table-header">Producto</th>
+                <th className="table-header">Categoría</th>
+                <th className="table-header text-right">Costo</th>
+                <th className="table-header text-right">Precio Venta</th>
+                <th className="table-header text-right">Margen</th>
+                <th className="table-header text-center">Stock</th>
+                <th className="table-header text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => {
+                const margin = product.costPrice > 0 
+                  ? ((product.salePrice - product.costPrice) / product.costPrice * 100).toFixed(1)
+                  : '0'
+                return (
+                  <tr key={product.id} className="hover:bg-primary-50/50 transition-colors">
+                    <td className="table-cell font-mono text-sm">{product.code}</td>
+                    <td className="table-cell">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-lg">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                          ) : '📦'}
+                        </div>
+                        <span className="font-medium">{product.name}</span>
+                      </div>
+                    </td>
+                    <td className="table-cell">
+                      <span className="badge badge-info">{product.category?.name || '-'}</span>
+                    </td>
+                    <td className="table-cell text-right">{formatCurrency(product.costPrice)}</td>
+                    <td className="table-cell text-right font-semibold text-primary-600">
+                      {formatCurrency(product.salePrice)}
+                    </td>
+                    <td className="table-cell text-right text-green-600">{margin}%</td>
+                    <td className="table-cell text-center">{getStockBadge(product)}</td>
+                    <td className="table-cell">
+                      <div className="flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => openEditProduct(product)}
+                          className="p-2 rounded-lg hover:bg-primary-100 text-gray-500 transition-colors"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(product)}
+                          className="p-2 rounded-lg hover:bg-red-100 text-red-500 transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Product Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-800">
+                {selectedProduct ? 'Editar Producto' : 'Nuevo Producto'}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Código *"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  required
+                />
+                <Input
+                  label="Código de Barras"
+                  value={formData.barcode}
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                />
+              </div>
+
+              <Input
+                label="Nombre *"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
+                <select
+                  value={formData.categoryId}
+                  onChange={(e) => setFormData({ ...formData, categoryId: Number(e.target.value) })}
+                  className="input-field"
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Precio Costo *"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.costPrice}
+                  onChange={(e) => setFormData({ ...formData, costPrice: e.target.value ? Number(e.target.value) : '' })}
+                  required
+                />
+                <Input
+                  label="Precio Venta *"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.salePrice}
+                  onChange={(e) => setFormData({ ...formData, salePrice: e.target.value ? Number(e.target.value) : '' })}
+                  required
+                />
+              </div>
+
+              {/* Imagen del producto */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-24 h-24 bg-primary-50 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-primary-200">
+                    {formData.imageUrl ? (
+                      <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Image className="w-8 h-8 text-primary-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      label="URL de la imagen"
+                      value={formData.imageUrl}
+                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                      placeholder="https://ejemplo.com/imagen.jpg"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Ingresa la URL de la imagen del producto</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock - siempre visible */}
+              <div className="border-t pt-4">
+                <h4 className="font-medium text-gray-700 mb-3">
+                  {selectedProduct ? 'Configuración de Stock' : 'Stock Inicial'}
+                </h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <Input
+                    label={selectedProduct ? "Stock Actual" : "Stock Inicial"}
+                    type="number"
+                    min="0"
+                    value={formData.initialStock}
+                    onChange={(e) => setFormData({ ...formData, initialStock: Number(e.target.value) })}
+                    disabled={!!selectedProduct}
+                  />
+                  <Input
+                    label="Stock Mínimo"
+                    type="number"
+                    min="0"
+                    value={formData.minStock}
+                    onChange={(e) => setFormData({ ...formData, minStock: Number(e.target.value) })}
+                  />
+                  <Input
+                    label="Stock Máximo"
+                    type="number"
+                    min="0"
+                    value={formData.maxStock}
+                    onChange={(e) => setFormData({ ...formData, maxStock: Number(e.target.value) })}
+                  />
+                </div>
+                {selectedProduct && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    Para modificar el stock actual, usa el módulo de Inventario
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary" disabled={saving}>
+                  {saving ? <><Loader2 className="w-5 h-5 animate-spin" /> Guardando...</> : 'Guardar'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ProductsPage
