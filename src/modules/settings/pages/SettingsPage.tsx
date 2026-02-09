@@ -13,6 +13,62 @@ const SettingsPage = () => {
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true // opcional
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
+  const validatePhone = (phone: string): boolean => {
+    if (!phone) return true // opcional
+    return /^[\d\s\-+()]+$/.test(phone) && phone.replace(/[\s\-+()]/g, '').length >= 7
+  }
+
+  const validateTaxId = (taxId: string): boolean => {
+    if (!taxId) return true // opcional
+    // Formato NIT colombiano: números con guión y dígito verificador
+    return /^[\d\-]+$/.test(taxId)
+  }
+
+  const handleCompanyChange = (field: string, value: string | number) => {
+    const newErrors = { ...errors }
+    
+    if (field === 'email' && typeof value === 'string') {
+      if (!validateEmail(value)) {
+        newErrors.email = 'Formato de email inválido'
+      } else {
+        delete newErrors.email
+      }
+    }
+    
+    if (field === 'phone' && typeof value === 'string') {
+      if (!validatePhone(value)) {
+        newErrors.phone = 'Teléfono debe contener solo números'
+      } else {
+        delete newErrors.phone
+      }
+    }
+    
+    if (field === 'taxId' && typeof value === 'string') {
+      if (!validateTaxId(value)) {
+        newErrors.taxId = 'NIT debe contener solo números y guiones'
+      } else {
+        delete newErrors.taxId
+      }
+    }
+    
+    if (field === 'taxRate' && typeof value === 'number') {
+      if (value < 0 || value > 100) {
+        newErrors.taxRate = 'La tasa debe estar entre 0 y 100'
+      } else {
+        delete newErrors.taxRate
+      }
+    }
+    
+    setErrors(newErrors)
+    dispatch(setCompany({ [field]: value }))
+  }
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -83,12 +139,21 @@ const SettingsPage = () => {
               onChange={(e) => dispatch(setCompany({ companyName: e.target.value }))} />
             <Input label="Razón Social" value={company.legalName} placeholder="Opcional"
               onChange={(e) => dispatch(setCompany({ legalName: e.target.value }))} />
-            <Input label="NIT / RUT" value={company.taxId} placeholder="Ej: 900123456-1"
-              onChange={(e) => dispatch(setCompany({ taxId: e.target.value }))} />
-            <Input label="Teléfono" value={company.phone}
-              onChange={(e) => dispatch(setCompany({ phone: e.target.value }))} />
-            <Input label="Email" type="email" value={company.email}
-              onChange={(e) => dispatch(setCompany({ email: e.target.value }))} />
+            <div>
+              <Input label="NIT / RUT" value={company.taxId} placeholder="Ej: 900123456-1"
+                onChange={(e) => handleCompanyChange('taxId', e.target.value)} />
+              {errors.taxId && <p className="text-xs text-red-500 mt-1">{errors.taxId}</p>}
+            </div>
+            <div>
+              <Input label="Teléfono" value={company.phone}
+                onChange={(e) => handleCompanyChange('phone', e.target.value)} />
+              {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+            </div>
+            <div>
+              <Input label="Email" type="email" value={company.email}
+                onChange={(e) => handleCompanyChange('email', e.target.value)} />
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+            </div>
             <Input label="Dirección" value={company.address}
               onChange={(e) => dispatch(setCompany({ address: e.target.value }))} />
           </div>
@@ -145,6 +210,26 @@ const SettingsPage = () => {
               </div>
               <p className="text-xs text-gray-400 mt-1">Color del fondo de la aplicación</p>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Color de Tarjetas</label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={theme.cardColor || '#ffffff'}
+                  onChange={(e) => dispatch(setTheme({ cardColor: e.target.value }))}
+                  className="w-12 h-12 rounded-xl cursor-pointer border-2 border-gray-200" />
+                <span className="text-gray-600 font-mono">{theme.cardColor || '#ffffff'}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Color de fondo de las tarjetas y secciones</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Color del Menú Lateral</label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={theme.sidebarColor || '#ffffff'}
+                  onChange={(e) => dispatch(setTheme({ sidebarColor: e.target.value }))}
+                  className="w-12 h-12 rounded-xl cursor-pointer border-2 border-gray-200" />
+                <span className="text-gray-600 font-mono">{theme.sidebarColor || '#ffffff'}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Color del menú de navegación lateral</p>
+            </div>
           </div>
         </div>
 
@@ -169,8 +254,11 @@ const SettingsPage = () => {
                 <option value="EUR">EUR - Euro</option>
               </select>
             </div>
-            <Input label="Tasa de Impuesto (%)" type="number" value={company.taxRate}
-              onChange={(e) => dispatch(setCompany({ taxRate: Number(e.target.value) }))} />
+            <div>
+              <Input label="Tasa de Impuesto (%)" type="number" min="0" max="100" value={company.taxRate}
+                onChange={(e) => handleCompanyChange('taxRate', Number(e.target.value))} />
+              {errors.taxRate && <p className="text-xs text-red-500 mt-1">{errors.taxRate}</p>}
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Negocio</label>
               <select 

@@ -117,8 +117,54 @@ const CustomersPage = () => {
     }
   }
 
+  const validateForm = (): boolean => {
+    // Validar nombre requerido
+    if (!formData.fullName.trim()) {
+      toast.error('El nombre completo es requerido')
+      return false
+    }
+
+    // Validar email si se proporciona
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      toast.error('El formato del email no es válido')
+      return false
+    }
+
+    // Validar documento - solo números
+    if (formData.documentNumber && !/^\d+$/.test(formData.documentNumber)) {
+      toast.error('El número de documento debe contener solo números')
+      return false
+    }
+
+    // Validar longitud de documento (6-15 dígitos para flexibilidad)
+    if (formData.documentNumber && (formData.documentNumber.length < 6 || formData.documentNumber.length > 15)) {
+      toast.error('El número de documento debe tener entre 6 y 15 dígitos')
+      return false
+    }
+
+    // Validar teléfono - solo números si se proporciona
+    if (formData.phone && !/^\d+$/.test(formData.phone.replace(/[\s-]/g, ''))) {
+      toast.error('El teléfono debe contener solo números')
+      return false
+    }
+
+    // Validar longitud de teléfono (7-15 dígitos)
+    if (formData.phone) {
+      const phoneDigits = formData.phone.replace(/[\s-]/g, '')
+      if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+        toast.error('El teléfono debe tener entre 7 y 15 dígitos')
+        return false
+      }
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!validateForm()) return
+    
     setSaving(true)
 
     try {

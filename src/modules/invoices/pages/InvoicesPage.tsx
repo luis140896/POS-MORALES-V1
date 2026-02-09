@@ -14,6 +14,7 @@ const InvoicesPage = () => {
   const [showVoidModal, setShowVoidModal] = useState(false)
   const [voidReason, setVoidReason] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [activeTab, setActiveTab] = useState<'active' | 'voided'>('active')
 
   useEffect(() => {
     fetchInvoices()
@@ -81,7 +82,13 @@ const InvoicesPage = () => {
     }
   }
 
-  const filteredInvoices = invoices.filter(inv => 
+  // Separar facturas activas y anuladas
+  const activeInvoices = invoices.filter(inv => inv.status !== 'ANULADA')
+  const voidedInvoices = invoices.filter(inv => inv.status === 'ANULADA')
+  
+  // Filtrar según tab activo y término de búsqueda
+  const currentInvoices = activeTab === 'active' ? activeInvoices : voidedInvoices
+  const filteredInvoices = currentInvoices.filter(inv => 
     inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.customer?.fullName?.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -93,6 +100,40 @@ const InvoicesPage = () => {
           <h1 className="text-2xl font-bold text-gray-800">Facturas</h1>
           <p className="text-gray-500">Historial de ventas y transacciones</p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+            activeTab === 'active'
+              ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
+              : 'bg-white text-gray-600 hover:bg-primary-50'
+          }`}
+        >
+          Activas
+          <span className={`px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'active' ? 'bg-white/20' : 'bg-primary-100 text-primary-600'
+          }`}>
+            {activeInvoices.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('voided')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+            activeTab === 'voided'
+              ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-soft'
+              : 'bg-white text-gray-600 hover:bg-red-50'
+          }`}
+        >
+          Anuladas
+          <span className={`px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'voided' ? 'bg-white/20' : 'bg-red-100 text-red-600'
+          }`}>
+            {voidedInvoices.length}
+          </span>
+        </button>
       </div>
 
       <div className="card">
@@ -136,7 +177,16 @@ const InvoicesPage = () => {
               {filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-primary-50/50 transition-colors">
                   <td className="table-cell font-mono">{invoice.invoiceNumber}</td>
-                  <td className="table-cell">{invoice.customer?.fullName || 'Cliente General'}</td>
+                  <td className="table-cell">
+                    <div>
+                      <p className="font-medium">{invoice.customer?.fullName || invoice.customerName || 'Cliente General'}</p>
+                      {(invoice.customer?.documentNumber || invoice.customerDocument) && (
+                        <p className="text-xs text-gray-500">
+                          {invoice.customer?.documentType || 'Doc'} {invoice.customer?.documentNumber || invoice.customerDocument}
+                        </p>
+                      )}
+                    </div>
+                  </td>
                   <td className="table-cell">{formatDate(invoice.createdAt)}</td>
                   <td className="table-cell text-right font-semibold text-primary-600">{formatCurrency(invoice.total)}</td>
                   <td className="table-cell text-center">{getStatusBadge(invoice.status)}</td>
@@ -182,9 +232,24 @@ const InvoicesPage = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Cliente:</span>
-                <span className="font-medium">{selectedInvoice.customer?.fullName || 'Cliente General'}</span>
+              {/* Información del Cliente */}
+              <div className="bg-primary-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-gray-600 mb-2">Información del Cliente</h4>
+                <p className="font-medium text-gray-800">{selectedInvoice.customer?.fullName || selectedInvoice.customerName || 'Cliente General'}</p>
+                {selectedInvoice.customer && (
+                  <div className="text-sm text-gray-500 mt-1 space-y-0.5">
+                    {selectedInvoice.customer.documentNumber && (
+                      <p>{selectedInvoice.customer.documentType}: {selectedInvoice.customer.documentNumber}</p>
+                    )}
+                    {selectedInvoice.customer.phone && <p>Tel: {selectedInvoice.customer.phone}</p>}
+                    {selectedInvoice.customer.email && <p>Email: {selectedInvoice.customer.email}</p>}
+                  </div>
+                )}
+                {!selectedInvoice.customer && selectedInvoice.customerDocument && (
+                  <div className="text-sm text-gray-500 mt-1 space-y-0.5">
+                    <p>Documento: {selectedInvoice.customerDocument}</p>
+                  </div>
+                )}
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Método de Pago:</span>

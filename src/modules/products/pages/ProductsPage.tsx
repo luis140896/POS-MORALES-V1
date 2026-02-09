@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit2, Trash2, Filter, X, Loader2, Image } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Filter, X, Loader2, Image, ArrowUp, ArrowDown, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import Input from '@/shared/components/ui/Input'
@@ -42,6 +42,11 @@ const initialFormData: ProductFormData = {
   imageUrl: ''
 }
 
+interface StockAdjustData {
+  product: Product
+  type: 'add' | 'remove'
+}
+
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -51,6 +56,11 @@ const ProductsPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState<ProductFormData>(initialFormData)
   const [saving, setSaving] = useState(false)
+  // Stock adjustment state
+  const [stockAdjust, setStockAdjust] = useState<StockAdjustData | null>(null)
+  const [adjustQuantity, setAdjustQuantity] = useState('')
+  const [adjustReason, setAdjustReason] = useState('')
+  const [adjusting, setAdjusting] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -132,14 +142,6 @@ const ProductsPage = () => {
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
 
-  const getStockBadge = (product: Product) => {
-    const qty = product.inventory?.quantity || 0
-    const min = product.inventory?.minStock || 10
-    if (qty === 0) return <span className="badge badge-danger">Sin stock</span>
-    if (qty <= min) return <span className="badge badge-warning">Stock bajo</span>
-    return <span className="badge badge-success">En stock</span>
-  }
-
   const openNewProduct = () => {
     setSelectedProduct(null)
     setFormData(initialFormData)
@@ -176,6 +178,47 @@ const ProductsPage = () => {
       fetchProducts()
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Error al eliminar producto')
+    }
+  }
+
+  const openStockAdjust = (product: Product, type: 'add' | 'remove') => {
+    setStockAdjust({ product, type })
+    setAdjustQuantity('')
+    setAdjustReason('')
+  }
+
+  const handleStockAdjust = async () => {
+    if (!stockAdjust || !adjustQuantity) return
+    
+    const qty = parseFloat(adjustQuantity)
+    if (qty <= 0) {
+      toast.error('La cantidad debe ser mayor a 0')
+      return
+    }
+
+    if (stockAdjust.type === 'remove') {
+      const currentStock = stockAdjust.product.inventory?.quantity || 0
+      if (qty > currentStock) {
+        toast.error('No hay suficiente stock disponible')
+        return
+      }
+    }
+
+    setAdjusting(true)
+    try {
+      if (stockAdjust.type === 'add') {
+        await inventoryService.addStock(stockAdjust.product.id, qty, adjustReason || undefined)
+        toast.success('Stock agregado correctamente')
+      } else {
+        await inventoryService.removeStock(stockAdjust.product.id, qty, adjustReason || undefined)
+        toast.success('Stock reducido correctamente')
+      }
+      setStockAdjust(null)
+      fetchProducts()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al ajustar stock')
+    } finally {
+      setAdjusting(false)
     }
   }
 
@@ -335,7 +378,31 @@ const ProductsPage = () => {
                       {formatCurrency(product.salePrice)}
                     </td>
                     <td className="table-cell text-right text-green-600">{margin}%</td>
-                    <td className="table-cell text-center">{getStockBadge(product)}</td>
+                    <td className="table-cell text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => openStockAdjust(product, 'remove')}
+                          className="p-1 rounded hover:bg-red-100 text-red-500 transition-colors"
+                          title="Salida de stock"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <span className={`font-semibold min-w-[40px] ${
+                          (product.inventory?.quantity || 0) === 0 ? 'text-red-600' :
+                          (product.inventory?.quantity || 0) <= (product.inventory?.minStock || 10) ? 'text-amber-600' :
+                          'text-green-600'
+                        }`}>
+                          {product.inventory?.quantity || 0}
+                        </span>
+                        <button
+                          onClick={() => openStockAdjust(product, 'add')}
+                          className="p-1 rounded hover:bg-green-100 text-green-500 transition-colors"
+                          title="Entrada de stock"
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                      </div>
+                    </td>
                     <td className="table-cell">
                       <div className="flex items-center justify-center gap-2">
                         <button 
@@ -484,8 +551,8 @@ const ProductsPage = () => {
                   />
                 </div>
                 {selectedProduct && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    Para modificar el stock actual, usa el módulo de Inventario
+                  <p className="text-xs text-gray-500 mt-2">
+                    💡 También puedes ajustar el stock desde la tabla de productos usando los botones +/-
                   </p>
                 )}
               </div>
@@ -499,6 +566,72 @@ const ProductsPage = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Adjustment Modal */}
+      {stockAdjust && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-800">
+                {stockAdjust.type === 'add' ? 'Entrada de Stock' : 'Salida de Stock'}
+              </h3>
+              <button onClick={() => setStockAdjust(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-primary-50 rounded-xl flex items-center gap-3">
+              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center">
+                {stockAdjust.product.imageUrl ? (
+                  <img src={stockAdjust.product.imageUrl} alt="" className="w-full h-full object-cover rounded-lg" />
+                ) : (
+                  <Package className="w-6 h-6 text-primary-400" />
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-gray-800">{stockAdjust.product.name}</p>
+                <p className="text-sm text-gray-500">Stock actual: <span className="font-semibold">{stockAdjust.product.inventory?.quantity || 0}</span></p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Input
+                label="Cantidad *"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={adjustQuantity}
+                onChange={(e) => setAdjustQuantity(e.target.value)}
+                required
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Razón (opcional)</label>
+                <textarea
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  className="input-field min-h-[80px]"
+                  placeholder="Motivo del ajuste..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button variant="secondary" className="flex-1" onClick={() => setStockAdjust(null)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="primary" 
+                className={`flex-1 ${stockAdjust.type === 'add' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                onClick={handleStockAdjust}
+                disabled={!adjustQuantity || adjusting}
+              >
+                {adjusting ? <Loader2 className="w-5 h-5 animate-spin" /> : (stockAdjust.type === 'add' ? 'Agregar' : 'Retirar')}
+              </Button>
+            </div>
           </div>
         </div>
       )}

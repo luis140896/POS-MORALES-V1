@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, X, Loader2, Package, ChevronRight } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Loader2, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import Input from '@/shared/components/ui/Input'
@@ -38,9 +38,24 @@ const CategoriesPage = () => {
   const [viewingCategory, setViewingCategory] = useState<Category | null>(null)
 
   const iconOptions = [
-    '🏷️', '🍎', '🥩', '🥖', '🥤', '🍺', '🍬', '🧀', '🍚', '🥫',
-    '🧴', '🧻', '🧼', '🪥', '💊', '🧸', '📚', '🎮', '🔌', '💡',
-    '🧰', '🛠️', '👕', '👟', '👜', '🐶', '🐱', '🌿', '🧊', '📦'
+    // Frutas
+    '�', '�', '🍋', '🍌', '🍇', '🍓', '🍑', '�', '�', '🍍',
+    '🍉', '🍒', '🍐', '�', '🥥',
+    // Verduras
+    '🥑', '🥕', '🥒', '🥬', '🥦', '🧅', '🧄', '�', '�', '🥔',
+    '🌶️', '🫑', '🥮',
+    // Carnes y Proteínas
+    '🥩', '🍗', '🍖', '🥓', '🍳', '🥚', '🐟', '🦐', '🦞', '🦑',
+    // Lácteos y Panadería
+    '🥛', '🧀', '🧈', '🥖', '�', '🥐', '🥯', '�', '🍰', '🎂',
+    // Bebidas
+    '�', '�', '☕', '🍵', '�', '🍺', '🍷', '�', '�', '🍹',
+    // Snacks y Dulces
+    '🍫', '🍬', '🍭', '🍪', '�', '🌰', '�', '🧂', '🍯', '🥫',
+    // Comidas Preparadas
+    '🍕', '🍔', '🌮', '🌯', '🥗', '🍜', '🍝', '🍛', '🍱', '�',
+    // Otros
+    '🏷️', '�', '�', '🧴', '🧼', '🧻', '�', '🧹', '🌿', '❄️'
   ]
 
   useEffect(() => {
@@ -167,40 +182,39 @@ const CategoriesPage = () => {
           No hay categorías registradas
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {categories.map((category) => (
-            <div key={category.id} className="card hover:scale-[1.02] transition-transform">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center text-3xl">
+            <div key={category.id} className="card hover:scale-[1.02] transition-transform p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
                   {category.imageUrl || '📦'}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <button 
                     onClick={() => openEditCategory(category)}
-                    className="p-2 rounded-lg hover:bg-primary-100 text-gray-500 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-primary-100 text-gray-400 transition-colors"
                   >
-                    <Edit2 size={18} />
+                    <Edit2 size={14} />
                   </button>
                   <button 
                     onClick={() => handleDelete(category)}
-                    className="p-2 rounded-lg hover:bg-red-100 text-red-500 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-red-100 text-red-400 transition-colors"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800">{category.name}</h3>
-              <p className="text-gray-500 text-sm mb-3">{category.description || 'Sin descripción'}</p>
-              <div className="flex items-center justify-between pt-3 border-t border-primary-100">
+              <h3 className="font-semibold text-gray-800 text-sm truncate" title={category.name}>{category.name}</h3>
+              <p className="text-gray-400 text-xs mb-2 line-clamp-1">{category.description || 'Sin descripción'}</p>
+              <div className="flex items-center justify-between pt-2 border-t border-primary-100">
                 <button 
                   onClick={() => viewCategoryProducts(category)}
-                  className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                  className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
                 >
-                  <Package size={14} />
-                  <span>{category.productCount || 0} productos</span>
-                  <ChevronRight size={14} />
+                  <Package size={12} />
+                  <span>{category.productCount || 0}</span>
                 </button>
-                <span className={`badge ${category.isActive ? 'badge-success' : 'badge-danger'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${category.isActive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                   {category.isActive ? 'Activa' : 'Inactiva'}
                 </span>
               </div>
@@ -325,9 +339,9 @@ const CategoriesPage = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Elegir icono</label>
                 <div className="grid grid-cols-10 gap-2">
-                  {iconOptions.map((icon) => (
+                  {iconOptions.map((icon, index) => (
                     <button
-                      key={icon}
+                      key={`${icon}-${index}`}
                       type="button"
                       onClick={() => setFormData({ ...formData, imageUrl: icon })}
                       className={`h-9 w-9 rounded-lg border flex items-center justify-center text-lg transition-colors ${

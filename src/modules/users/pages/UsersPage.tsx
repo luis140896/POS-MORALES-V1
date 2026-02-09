@@ -86,8 +86,62 @@ const UsersPage = () => {
     }
   }
 
+  const validateForm = (): boolean => {
+    // Validar nombre completo
+    if (!formData.fullName.trim()) {
+      toast.error('El nombre completo es requerido')
+      return false
+    }
+
+    // Validar username
+    if (!formData.username.trim()) {
+      toast.error('El nombre de usuario es requerido')
+      return false
+    }
+
+    // Validar formato de username (sin espacios, caracteres especiales limitados)
+    if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      toast.error('El usuario solo puede contener letras, números y guiones bajos')
+      return false
+    }
+
+    // Validar email
+    if (!formData.email.trim()) {
+      toast.error('El email es requerido')
+      return false
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      toast.error('El formato del email no es válido')
+      return false
+    }
+
+    // Validar contraseña solo para nuevos usuarios
+    if (!selectedUser) {
+      if (!formData.password) {
+        toast.error('La contraseña es requerida')
+        return false
+      }
+      if (formData.password.length < 6) {
+        toast.error('La contraseña debe tener al menos 6 caracteres')
+        return false
+      }
+    }
+
+    // Validar rol
+    if (!formData.roleId) {
+      toast.error('Debe seleccionar un rol')
+      return false
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!validateForm()) return
+    
     setSaving(true)
 
     try {

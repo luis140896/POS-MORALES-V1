@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Search, AlertTriangle, Package, ArrowUp, ArrowDown, Filter, X, Loader2, Edit2, Image } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Search, AlertTriangle, Package, ArrowUp, ArrowDown, Filter, X, Loader2, Edit2, Image, Download, Upload, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import Input from '@/shared/components/ui/Input'
@@ -58,6 +59,8 @@ const InventoryPage = () => {
   const [editingItem, setEditingItem] = useState<Inventory | null>(null)
   const [formData, setFormData] = useState<ProductFormData>(initialFormData)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const getProductId = (item: any): number | undefined => item?.product?.id ?? item?.productId
   const getProductCode = (item: any): string => item?.product?.code ?? item?.productCode ?? ''
@@ -200,6 +203,152 @@ const InventoryPage = () => {
     }
   }
 
+  // ============ EXCEL FUNCTIONS ============
+  
+  const exportToExcel = () => {
+    const exportData = inventory.map(item => ({
+      'Código': getProductCode(item),
+      'Producto': getProductName(item),
+      'Stock Actual': item.quantity,
+      'Stock Mínimo': item.minStock,
+      'Stock Máximo': item.maxStock,
+      'Ubicación': item.location || '',
+      'Estado': item.quantity === 0 ? 'Sin stock' : item.quantity <= item.minStock ? 'Stock bajo' : 'Normal'
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
+    
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 15 }, // Código
+      { wch: 40 }, // Producto
+      { wch: 12 }, // Stock Actual
+      { wch: 12 }, // Stock Mínimo
+      { wch: 12 }, // Stock Máximo
+      { wch: 20 }, // Ubicación
+      { wch: 12 }, // Estado
+    ]
+
+    const date = new Date().toISOString().split('T')[0]
+    XLSX.writeFile(wb, `inventario_${date}.xlsx`)
+    toast.success('Inventario exportado correctamente')
+  }
+
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        'Código': 'PROD001',
+        'Nombre': 'Producto de ejemplo',
+        'Categoría': 'Nombre de categoría',
+        'Precio Costo': 1000,
+        'Precio Venta': 1500,
+        'Stock Inicial': 10,
+        'Stock Mínimo': 5,
+        'Stock Máximo': 100,
+        'Unidad': 'UND',
+        'Descripción': 'Descripción opcional'
+      }
+    ]
+
+    const ws = XLSX.utils.json_to_sheet(templateData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla')
+    
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 15 }, { wch: 30 }, { wch: 20 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+      { wch: 10 }, { wch: 30 }
+    ]
+
+    XLSX.writeFile(wb, 'plantilla_productos.xlsx')
+    toast.success('Plantilla descargada')
+  }
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImporting(true)
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+      if (jsonData.length === 0) {
+        toast.error('El archivo está vacío')
+        return
+      }
+
+      let successCount = 0
+      let errorCount = 0
+
+      for (const row of jsonData as any[]) {
+        try {
+          // Buscar categoría por nombre
+          const categoryName = row['Categoría'] || row['Categoria']
+          const category = categories.find(c => 
+            c.name.toLowerCase() === categoryName?.toLowerCase()
+          )
+
+          if (!category) {
+            console.warn(`Categoría no encontrada: ${categoryName}`)
+            errorCount++
+            continue
+          }
+
+          const productData = {
+            code: String(row['Código'] || row['Codigo'] || ''),
+            name: String(row['Nombre'] || ''),
+            description: String(row['Descripción'] || row['Descripcion'] || ''),
+            categoryId: category.id,
+            costPrice: Number(row['Precio Costo'] || row['PrecioCosto'] || 0),
+            salePrice: Number(row['Precio Venta'] || row['PrecioVenta'] || 0),
+            unit: String(row['Unidad'] || 'UND'),
+            taxRate: Number(row['Impuesto'] || 0),
+            isActive: true,
+            minStock: Number(row['Stock Mínimo'] || row['StockMinimo'] || 0),
+            maxStock: Number(row['Stock Máximo'] || row['StockMaximo'] || 999999),
+            initialStock: Number(row['Stock Inicial'] || row['StockInicial'] || 0)
+          }
+
+          if (!productData.code || !productData.name) {
+            errorCount++
+            continue
+          }
+
+          await productService.create(productData)
+          successCount++
+        } catch (err) {
+          console.error('Error importing row:', err)
+          errorCount++
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} productos importados correctamente`)
+        fetchInventory()
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} productos no pudieron importarse`)
+      }
+    } catch (error) {
+      console.error('Error reading file:', error)
+      toast.error('Error al leer el archivo Excel')
+    } finally {
+      setImporting(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  // ============ END EXCEL FUNCTIONS ============
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingItem) return
@@ -258,6 +407,27 @@ const InventoryPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Inventario</h1>
           <p className="text-gray-500">Control y gestión de stock</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={downloadTemplate}>
+            <FileSpreadsheet size={20} />
+            Plantilla
+          </Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload size={20} />}
+            Importar
+          </Button>
+          <Button variant="primary" onClick={exportToExcel}>
+            <Download size={20} />
+            Exportar
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportExcel}
+            className="hidden"
+          />
         </div>
       </div>
 

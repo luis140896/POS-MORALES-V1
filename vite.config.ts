@@ -10,7 +10,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5176,
+    port: 5178,
+    host: true,
+    allowedHosts: ['surf-develops-talented-side.trycloudflare.com'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

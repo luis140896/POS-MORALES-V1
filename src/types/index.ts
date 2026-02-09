@@ -78,7 +78,9 @@ export interface Invoice {
   id: number
   invoiceNumber: string
   invoiceType: string
-  customerId: number
+  customerId?: number | null
+  customerName?: string
+  customerDocument?: string
   customer?: Customer
   userId: number
   subtotal: number

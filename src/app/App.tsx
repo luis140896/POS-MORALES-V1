@@ -73,7 +73,15 @@ function App() {
     // Aplicar color de fondo
     root.style.setProperty('--color-background', theme.backgroundColor)
     document.body.style.background = `linear-gradient(135deg, ${theme.backgroundColor} 0%, hsl(${primary.h}, ${primary.s}%, 94%) 50%, ${theme.backgroundColor} 100%)`
-  }, [theme.primaryColor, theme.secondaryColor, theme.backgroundColor])
+    
+    // Aplicar color de tarjetas
+    const cardColor = theme.cardColor || '#ffffff'
+    root.style.setProperty('--color-card', cardColor)
+    
+    // Aplicar color del sidebar
+    const sidebarColor = theme.sidebarColor || '#ffffff'
+    root.style.setProperty('--color-sidebar', sidebarColor)
+  }, [theme.primaryColor, theme.secondaryColor, theme.backgroundColor, theme.cardColor, theme.sidebarColor])
 
   return (
     <Routes>

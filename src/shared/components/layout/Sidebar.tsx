@@ -45,9 +45,10 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-full bg-white shadow-soft z-30 transition-all duration-300 ${
+      className={`fixed left-0 top-0 h-full shadow-soft z-30 transition-all duration-300 ${
         isOpen ? 'w-64' : 'w-20'
       }`}
+      style={{ backgroundColor: 'var(--color-sidebar, #ffffff)' }}
     >
       <div className="flex flex-col h-full">
         {/* Logo */}

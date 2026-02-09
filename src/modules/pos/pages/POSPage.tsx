@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, FileText, Grid3X3, LayoutGrid, Grid2X2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
 import { addItem, removeItem, incrementQuantity, decrementQuantity, clearCart, setCustomer, selectCartTotal } from '../store/cartSlice'
@@ -32,6 +32,12 @@ const POSPage = () => {
   const [amountReceived, setAmountReceived] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>('medium')
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
+  const [newCustomerData, setNewCustomerData] = useState({ fullName: '', documentType: 'CC', documentNumber: '', phone: '' })
+  const [savingCustomer, setSavingCustomer] = useState(false)
+  const [completedInvoice, setCompletedInvoice] = useState<any>(null)
+  const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -71,7 +77,9 @@ const POSPage = () => {
       ])
       setProducts((productsRes as any[]).map(normalizeProduct))
       setCategories(categoriesRes as Category[])
-      setCustomers(((customersRes as any).content || customersRes) as Customer[])
+      // Filtrar solo clientes activos
+      const allCustomers = ((customersRes as any).content || customersRes) as Customer[]
+      setCustomers(allCustomers.filter((c: Customer) => c.isActive !== false))
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('Error al cargar productos')
@@ -104,49 +112,163 @@ const POSPage = () => {
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
 
+  const gridClasses = {
+    small: 'grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+    medium: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+    large: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+  }
+
+  const handleCreateCustomer = async () => {
+    if (!newCustomerData.fullName.trim()) {
+      toast.error('El nombre es requerido')
+      return
+    }
+    setSavingCustomer(true)
+    try {
+      const created = await customerService.create(newCustomerData)
+      const newCustomer = created as Customer
+      setCustomers(prev => [...prev, newCustomer])
+      dispatch(setCustomer({ id: newCustomer.id, name: newCustomer.fullName }))
+      setShowNewCustomerModal(false)
+      setShowCustomerModal(false)
+      setNewCustomerData({ fullName: '', documentType: 'CC', documentNumber: '', phone: '' })
+      toast.success('Cliente creado y seleccionado')
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al crear cliente')
+    } finally {
+      setSavingCustomer(false)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  const handlePrintInvoice = () => {
+    if (!completedInvoice) return
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Factura ${completedInvoice.invoiceNumber}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; max-width: 300px; margin: 0 auto; }
+              .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+              .header h1 { margin: 0; font-size: 18px; }
+              .info { margin-bottom: 15px; font-size: 12px; }
+              .info div { margin: 3px 0; }
+              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; margin: 10px 0; }
+              .item { display: flex; justify-content: space-between; font-size: 12px; margin: 5px 0; }
+              .totals { font-size: 12px; }
+              .totals div { display: flex; justify-content: space-between; margin: 3px 0; }
+              .total-final { font-size: 16px; font-weight: bold; border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px; }
+              .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>FACTURA DE VENTA</h1>
+              <p>N° ${completedInvoice.invoiceNumber}</p>
+            </div>
+            <div class="info">
+              <div>Fecha: ${formatDate(completedInvoice.createdAt)}</div>
+              <div>Cliente: ${completedInvoice.customer?.fullName || completedInvoice.customerName || 'Cliente General'}</div>
+              <div>Método: ${completedInvoice.paymentMethod}</div>
+            </div>
+            <div class="items">
+              ${completedInvoice.details?.map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
+            </div>
+            <div class="totals">
+              <div><span>Subtotal:</span><span>${formatCurrency(completedInvoice.subtotal)}</span></div>
+              ${completedInvoice.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(completedInvoice.discountAmount)}</span></div>` : ''}
+              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(completedInvoice.total)}</span></div>
+            </div>
+            <div class="footer">¡Gracias por su compra!</div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
+    }
+  }
+
   return (
-    <div className="h-[calc(100vh-7rem)] flex gap-6 animate-fade-in">
+    <div className="h-[calc(100vh-7rem)] flex flex-col lg:flex-row gap-6 animate-fade-in overflow-hidden overflow-x-hidden">
       {/* Left Panel - Products */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Search */}
-        <div className="relative mb-4">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <div className="relative mb-3 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Buscar por nombre o código..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field pl-12"
+            className="input-field pl-10 py-2 text-sm"
           />
         </div>
 
-        {/* Categories */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-          <button
-            onClick={() => setSelectedCategory(null)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all ${
-              selectedCategory === null
-                ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
-                : 'bg-white text-gray-600 hover:bg-primary-50'
-            }`}
-          >
-            <span>🏷️</span>
-            <span className="text-sm font-medium">Todos</span>
-          </button>
-          {categories.map((cat) => (
+        {/* Categories + Size Selector */}
+        <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-1 bg-white rounded-xl p-1 flex-shrink-0">
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all ${
-                selectedCategory === cat.id
-                  ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
-                  : 'bg-white text-gray-600 hover:bg-primary-50'
-              }`}
+              onClick={() => setCardSize('small')}
+              className={`p-2 rounded-lg transition-colors ${cardSize === 'small' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Vista compacta"
             >
-              <span>{cat.imageUrl || '📦'}</span>
-              <span className="text-sm font-medium">{cat.name}</span>
+              <Grid3X3 size={18} />
             </button>
-          ))}
+            <button
+              onClick={() => setCardSize('medium')}
+              className={`p-2 rounded-lg transition-colors ${cardSize === 'medium' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Vista normal"
+            >
+              <Grid2X2 size={18} />
+            </button>
+            <button
+              onClick={() => setCardSize('large')}
+              className={`p-2 rounded-lg transition-colors ${cardSize === 'large' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Vista grande"
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-soft p-3 max-h-[220px] overflow-y-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pb-3">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`flex items-start gap-2 px-3 py-2 rounded-xl transition-all min-w-0 ${
+                  selectedCategory === null
+                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
+                    : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
+                }`}
+                title="Todos"
+              >
+                <span className="flex-shrink-0">🏷️</span>
+                <span className="text-xs font-medium break-words leading-tight">Todos</span>
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`flex items-start gap-2 px-3 py-2 rounded-xl transition-all min-w-0 ${
+                    selectedCategory === cat.id
+                      ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
+                      : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
+                  }`}
+                  title={cat.name}
+                >
+                  <span className="flex-shrink-0">{cat.imageUrl || '📦'}</span>
+                  <span className="text-xs font-medium break-words leading-tight">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Products Grid */}
@@ -160,7 +282,7 @@ const POSPage = () => {
               <p>No se encontraron productos</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className={`grid ${gridClasses[cardSize]} gap-4`}>
               {filteredProducts.map((product) => {
                 const stock = product.inventory?.quantity || 0
                 const cartItem = items.find(i => i.id === product.id)
@@ -215,8 +337,8 @@ const POSPage = () => {
         </div>
       </div>
 
-      {/* Right Panel - Cart */}
-      <div className="w-96 bg-white rounded-2xl shadow-soft flex flex-col">
+      {/* Right Panel - Cart (FIXED) */}
+      <div className="w-full lg:w-96 flex-shrink-0 bg-white rounded-2xl shadow-soft flex flex-col min-w-0">
         {/* Header */}
         <div className="p-4 border-b border-primary-100">
           <div className="flex items-center justify-between mb-2">
@@ -236,6 +358,9 @@ const POSPage = () => {
           >
             <User size={16} />
             <span>{customerName}</span>
+            {customerId !== null && (
+              <span className="text-xs text-gray-400">(ID: {customerId})</span>
+            )}
             <span className="text-xs text-primary-500">(cambiar)</span>
           </button>
         </div>
@@ -444,9 +569,12 @@ const POSPage = () => {
                     }
                     
                     const result = await invoiceService.createSale(saleRequest)
-                    toast.success(`Venta ${(result as any).invoiceNumber} completada`)
+                    // Obtener detalle completo de la factura
+                    const invoiceDetail = await invoiceService.getById((result as any).id)
+                    setCompletedInvoice(invoiceDetail)
                     dispatch(clearCart())
                     setShowPaymentModal(false)
+                    setShowInvoiceConfirmModal(true)
                     fetchData() // Refresh products to update stock
                   } catch (error: any) {
                     console.error('Error processing sale:', error)
@@ -539,6 +667,158 @@ const POSPage = () => {
                   No se encontraron clientes
                 </div>
               )}
+            </div>
+
+            {/* Botón Nuevo Cliente */}
+            <div className="mt-4 pt-4 border-t border-primary-100">
+              <button
+                onClick={() => setShowNewCustomerModal(true)}
+                className="w-full flex items-center justify-center gap-2 p-3 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 transition-colors"
+              >
+                <UserPlus size={20} />
+                <span className="font-medium">Crear Nuevo Cliente</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Customer Modal */}
+      {showNewCustomerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Nuevo Cliente</h3>
+              <button 
+                onClick={() => setShowNewCustomerModal(false)} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                <input
+                  type="text"
+                  value={newCustomerData.fullName}
+                  onChange={(e) => setNewCustomerData({ ...newCustomerData, fullName: e.target.value })}
+                  className="input-field"
+                  placeholder="Nombre del cliente"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Doc.</label>
+                  <select
+                    value={newCustomerData.documentType}
+                    onChange={(e) => setNewCustomerData({ ...newCustomerData, documentType: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="CC">CC</option>
+                    <option value="NIT">NIT</option>
+                    <option value="CE">CE</option>
+                    <option value="TI">TI</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                  <input
+                    type="text"
+                    value={newCustomerData.documentNumber}
+                    onChange={(e) => setNewCustomerData({ ...newCustomerData, documentNumber: e.target.value })}
+                    className="input-field"
+                    placeholder="Documento"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={newCustomerData.phone}
+                  onChange={(e) => setNewCustomerData({ ...newCustomerData, phone: e.target.value })}
+                  className="input-field"
+                  placeholder="Teléfono (opcional)"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowNewCustomerModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateCustomer}
+                disabled={savingCustomer || !newCustomerData.fullName.trim()}
+                className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingCustomer ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus size={20} />}
+                {savingCustomer ? 'Guardando...' : 'Crear y Seleccionar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Confirmation Modal */}
+      {showInvoiceConfirmModal && completedInvoice && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">¡Venta Completada!</h3>
+              <p className="text-gray-500 mt-1">Factura N° {completedInvoice.invoiceNumber}</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Cliente:</span>
+                <span className="font-medium">{completedInvoice.customer?.fullName || 'Cliente General'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Método:</span>
+                <span>{completedInvoice.paymentMethod}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Items:</span>
+                <span>{completedInvoice.details?.length || 0} productos</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
+                <span>Total:</span>
+                <span className="text-primary-600">{formatCurrency(completedInvoice.total)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={handlePrintInvoice}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors"
+              >
+                <Printer size={20} />
+                Imprimir Factura
+              </button>
+              <button
+                onClick={() => {
+                  setShowInvoiceConfirmModal(false)
+                  setCompletedInvoice(null)
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                <X size={20} />
+                Cerrar sin Imprimir
+              </button>
             </div>
           </div>
         </div>

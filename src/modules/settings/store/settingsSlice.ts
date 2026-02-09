@@ -5,6 +5,8 @@ interface ThemeConfig {
   secondaryColor: string
   accentColor: string
   backgroundColor: string
+  cardColor: string
+  sidebarColor: string
 }
 
 interface CompanyConfig {
@@ -55,6 +57,8 @@ const defaultState: SettingsState = {
     secondaryColor: '#7c3aed',
     accentColor: '#c4b5fd',
     backgroundColor: '#f3e8ff',
+    cardColor: '#ffffff',
+    sidebarColor: '#ffffff',
   },
   company: {
     companyName: 'Mi Negocio',

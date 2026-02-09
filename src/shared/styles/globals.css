@@ -15,6 +15,10 @@
   --color-primary-800: hsl(270, 69%, 30%);
   --color-primary-900: hsl(270, 62%, 20%);
   
+  /* Colores de componentes - personalizables */
+  --color-card: #ffffff;
+  --color-sidebar: #ffffff;
+  
   /* Variables legacy para compatibilidad */
   --primary-50: var(--color-primary-50);
   --primary-100: var(--color-primary-100);
@@ -85,12 +89,14 @@ body {
   }
 
   .card {
-    @apply bg-white rounded-2xl shadow-soft p-6 transition-all duration-300
+    @apply rounded-2xl shadow-soft p-6 transition-all duration-300
            hover:shadow-hover;
+    background-color: var(--color-card, #ffffff);
   }
 
   .card-flat {
-    @apply bg-white rounded-2xl p-6 border border-primary-100;
+    @apply rounded-2xl p-6 border border-primary-100;
+    background-color: var(--color-card, #ffffff);
   }
 
   .sidebar-link {
