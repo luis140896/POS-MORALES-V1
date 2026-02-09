@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port: 5178,
     host: true,
-    allowedHosts: ['surf-develops-talented-side.trycloudflare.com'],
+    allowedHosts: ['freight-nec-killing-protest.trycloudflare.com'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
