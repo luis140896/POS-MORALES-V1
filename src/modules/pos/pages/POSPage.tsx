@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, FileText, Grid3X3, LayoutGrid, Grid2X2 } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, Grid3X3, LayoutGrid, Grid2X2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
 import { addItem, removeItem, incrementQuantity, decrementQuantity, clearCart, setCustomer, selectCartTotal } from '../store/cartSlice'
@@ -13,6 +13,467 @@ import { Product, Category, Customer } from '@/types'
 
 interface ProductWithCategory extends Product {
   categoryId: number
+}
+
+interface InvoiceConfirmModalProps {
+  show: boolean
+  completedInvoice: any
+  onPrint: () => void
+  onClose: () => void
+  formatCurrency: (value: number) => string
+}
+
+const InvoiceConfirmModal = ({
+  show,
+  completedInvoice,
+  onPrint,
+  onClose,
+  formatCurrency,
+}: InvoiceConfirmModalProps) => {
+  if (!show || !completedInvoice) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800">¡Venta Completada!</h3>
+          <p className="text-gray-500 mt-1">Factura N° {completedInvoice.invoiceNumber}</p>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Cliente:</span>
+            <span className="font-medium">{completedInvoice.customer?.fullName || 'Cliente General'}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Método:</span>
+            <span>{completedInvoice.paymentMethod}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Items:</span>
+            <span>{completedInvoice.details?.length || 0} productos</span>
+          </div>
+          <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
+            <span>Total:</span>
+            <span className="text-primary-600">{formatCurrency(completedInvoice.total)}</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            onClick={onPrint}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors"
+          >
+            <Printer size={20} />
+            Imprimir Factura
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+          >
+            <X size={20} />
+            Cerrar sin Imprimir
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface CustomerSelectionModalProps {
+  show: boolean
+  customerId: number | null
+  customerSearch: string
+  setCustomerSearch: (value: string) => void
+  filteredCustomers: Customer[]
+  onClose: () => void
+  onSelectCustomer: (customer: Customer | null) => void
+  onOpenNewCustomer: () => void
+}
+
+const CustomerSelectionModal = ({
+  show,
+  customerId,
+  customerSearch,
+  setCustomerSearch,
+  filteredCustomers,
+  onClose,
+  onSelectCustomer,
+  onOpenNewCustomer,
+}: CustomerSelectionModalProps) => {
+  if (!show) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] flex flex-col animate-scale-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-800">Seleccionar Cliente</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="relative mb-4">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, documento o teléfono..."
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            className="input-field pl-12"
+            autoFocus
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-2">
+          <button
+            onClick={() => onSelectCustomer(null)}
+            className={`w-full p-3 rounded-xl text-left transition-colors ${
+              customerId === null ? 'bg-primary-100 border-2 border-primary-500' : 'bg-gray-50 hover:bg-primary-50'
+            }`}
+          >
+            <p className="font-medium text-gray-800">Cliente General</p>
+            <p className="text-sm text-gray-500">Sin datos de cliente</p>
+          </button>
+
+          {filteredCustomers.map((customer) => (
+            <button
+              key={customer.id}
+              onClick={() => onSelectCustomer(customer)}
+              className={`w-full p-3 rounded-xl text-left transition-colors ${
+                customerId === customer.id ? 'bg-primary-100 border-2 border-primary-500' : 'bg-gray-50 hover:bg-primary-50'
+              }`}
+            >
+              <p className="font-medium text-gray-800">{customer.fullName}</p>
+              <p className="text-sm text-gray-500">
+                {customer.documentType} {customer.documentNumber}
+                {customer.phone && ` • ${customer.phone}`}
+              </p>
+            </button>
+          ))}
+
+          {filteredCustomers.length === 0 && customerSearch && (
+            <div className="text-center py-8 text-gray-400">No se encontraron clientes</div>
+          )}
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-primary-100">
+          <button
+            onClick={onOpenNewCustomer}
+            className="w-full flex items-center justify-center gap-2 p-3 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 transition-colors"
+          >
+            <UserPlus size={20} />
+            <span className="font-medium">Crear Nuevo Cliente</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface NewCustomerModalProps {
+  show: boolean
+  newCustomerData: {
+    fullName: string
+    documentType: string
+    documentNumber: string
+    phone: string
+  }
+  setNewCustomerData: (data: { fullName: string; documentType: string; documentNumber: string; phone: string }) => void
+  savingCustomer: boolean
+  onClose: () => void
+  onCreate: () => void
+}
+
+const NewCustomerModal = ({
+  show,
+  newCustomerData,
+  setNewCustomerData,
+  savingCustomer,
+  onClose,
+  onCreate,
+}: NewCustomerModalProps) => {
+  if (!show) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-800">Nuevo Cliente</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+            <input
+              type="text"
+              value={newCustomerData.fullName}
+              onChange={(e) => setNewCustomerData({ ...newCustomerData, fullName: e.target.value })}
+              className="input-field"
+              placeholder="Nombre del cliente"
+              autoFocus
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Doc.</label>
+              <select
+                value={newCustomerData.documentType}
+                onChange={(e) => setNewCustomerData({ ...newCustomerData, documentType: e.target.value })}
+                className="input-field"
+              >
+                <option value="CC">CC</option>
+                <option value="NIT">NIT</option>
+                <option value="CE">CE</option>
+                <option value="TI">TI</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+              <input
+                type="text"
+                value={newCustomerData.documentNumber}
+                onChange={(e) => setNewCustomerData({ ...newCustomerData, documentNumber: e.target.value })}
+                className="input-field"
+                placeholder="Documento"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+            <input
+              type="text"
+              value={newCustomerData.phone}
+              onChange={(e) => setNewCustomerData({ ...newCustomerData, phone: e.target.value })}
+              className="input-field"
+              placeholder="Teléfono (opcional)"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onCreate}
+            disabled={savingCustomer || !newCustomerData.fullName.trim()}
+            className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {savingCustomer ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus size={20} />}
+            {savingCustomer ? 'Guardando...' : 'Crear y Seleccionar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type CardSize = 'small' | 'medium' | 'large'
+
+interface CategoriesPanelProps {
+  cardSize: CardSize
+  setCardSize: (size: CardSize) => void
+  categories: Category[]
+  selectedCategory: number | null
+  setSelectedCategory: (categoryId: number | null) => void
+}
+
+const CategoriesPanel = ({
+  cardSize,
+  setCardSize,
+  categories,
+  selectedCategory,
+  setSelectedCategory,
+}: CategoriesPanelProps) => {
+  return (
+    <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-1 bg-white rounded-xl p-1 flex-shrink-0">
+          <button
+            onClick={() => setCardSize('small')}
+            className={`p-2 rounded-lg transition-colors ${cardSize === 'small' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
+            title="Vista compacta"
+          >
+            <Grid3X3 size={18} />
+          </button>
+          <button
+            onClick={() => setCardSize('medium')}
+            className={`p-2 rounded-lg transition-colors ${cardSize === 'medium' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
+            title="Vista normal"
+          >
+            <Grid2X2 size={18} />
+          </button>
+          <button
+            onClick={() => setCardSize('large')}
+            className={`p-2 rounded-lg transition-colors ${cardSize === 'large' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
+            title="Vista grande"
+          >
+            <LayoutGrid size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-soft p-3 h-auto max-h-[220px] overflow-y-auto inline-block w-fit max-w-full">
+        <div className="flex flex-wrap gap-2 pb-3">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={`inline-flex items-start gap-2 px-3 py-2 rounded-xl transition-all w-auto max-w-full ${
+              selectedCategory === null
+                ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
+                : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
+            }`}
+            title="Todos"
+          >
+            <span className="flex-shrink-0">🏷️</span>
+            <span className="text-xs font-medium whitespace-normal break-words leading-tight">Todos</span>
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`inline-flex items-start gap-2 px-3 py-2 rounded-xl transition-all w-auto max-w-full ${
+                selectedCategory === cat.id
+                  ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
+                  : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
+              }`}
+              title={cat.name}
+            >
+              <span className="flex-shrink-0">{cat.imageUrl || '📦'}</span>
+              <span className="text-xs font-medium whitespace-normal break-words leading-tight">{cat.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface PaymentModalProps {
+  show: boolean
+  paymentMethod: 'EFECTIVO' | 'TARJETA_CREDITO'
+  subtotal: number
+  discountAmount: number
+  total: number
+  amountReceived: string
+  setAmountReceived: (value: string) => void
+  processing: boolean
+  onClose: () => void
+  onConfirm: () => Promise<void>
+  formatCurrency: (value: number) => string
+}
+
+const PaymentModal = ({
+  show,
+  paymentMethod,
+  subtotal,
+  discountAmount,
+  total,
+  amountReceived,
+  setAmountReceived,
+  processing,
+  onClose,
+  onConfirm,
+  formatCurrency,
+}: PaymentModalProps) => {
+  if (!show) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-800">
+            Pago con {paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+            disabled={processing}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Subtotal</span>
+            <span>{formatCurrency(subtotal)}</span>
+          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Descuento</span>
+              <span>-{formatCurrency(discountAmount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-lg font-bold border-t pt-2">
+            <span>Total a pagar</span>
+            <span className="text-primary-600">{formatCurrency(total)}</span>
+          </div>
+
+          {paymentMethod === 'EFECTIVO' ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monto recibido</label>
+                <input
+                  type="number"
+                  value={amountReceived}
+                  onChange={(e) => setAmountReceived(e.target.value)}
+                  className="input-field"
+                  min={total}
+                />
+              </div>
+              {parseFloat(amountReceived) >= total && (
+                <div className="flex justify-between text-lg font-bold text-green-600">
+                  <span>Cambio</span>
+                  <span>{formatCurrency(parseFloat(amountReceived) - total)}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-4 bg-primary-50 rounded-xl text-center">
+              <CreditCard className="w-12 h-12 mx-auto text-primary-600 mb-2" />
+              <p className="text-sm text-gray-600">El pago se procesará con tarjeta</p>
+              <p className="text-xs text-gray-400 mt-1">El monto exacto será cobrado al cliente</p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            variant="primary"
+            className="w-full"
+            disabled={processing || (paymentMethod === 'EFECTIVO' && parseFloat(amountReceived) < total)}
+            onClick={onConfirm}
+          >
+            {processing ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              'Confirmar Venta'
+            )}
+          </Button>
+          <Button variant="secondary" className="w-full" onClick={onClose} disabled={processing}>
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const POSPage = () => {
@@ -32,7 +493,7 @@ const POSPage = () => {
   const [amountReceived, setAmountReceived] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
-  const [cardSize, setCardSize] = useState<'small' | 'medium' | 'large'>('medium')
+  const [cardSize, setCardSize] = useState<CardSize>('medium')
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
   const [newCustomerData, setNewCustomerData] = useState({ fullName: '', documentType: 'CC', documentNumber: '', phone: '' })
   const [savingCustomer, setSavingCustomer] = useState(false)
@@ -145,6 +606,38 @@ const POSPage = () => {
     return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  const handleConfirmSale = async () => {
+    setProcessing(true)
+    try {
+      const saleRequest = {
+        customerId: customerId,
+        paymentMethod: paymentMethod,
+        discountPercent: discountType === 'percent' ? discount : 0,
+        amountReceived: parseFloat(amountReceived),
+        notes: notes,
+        details: items.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          discountAmount: 0
+        }))
+      }
+
+      const result = await invoiceService.createSale(saleRequest)
+      const invoiceDetail = await invoiceService.getById((result as any).id)
+      setCompletedInvoice(invoiceDetail)
+      dispatch(clearCart())
+      setShowPaymentModal(false)
+      setShowInvoiceConfirmModal(true)
+      fetchData()
+    } catch (error: any) {
+      console.error('Error processing sale:', error)
+      toast.error(error.response?.data?.message || 'Error al procesar la venta')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   const handlePrintInvoice = () => {
     if (!completedInvoice) return
     const printWindow = window.open('', '_blank')
@@ -210,66 +703,13 @@ const POSPage = () => {
           />
         </div>
 
-        {/* Categories + Size Selector */}
-        <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex gap-1 bg-white rounded-xl p-1 flex-shrink-0">
-            <button
-              onClick={() => setCardSize('small')}
-              className={`p-2 rounded-lg transition-colors ${cardSize === 'small' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Vista compacta"
-            >
-              <Grid3X3 size={18} />
-            </button>
-            <button
-              onClick={() => setCardSize('medium')}
-              className={`p-2 rounded-lg transition-colors ${cardSize === 'medium' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Vista normal"
-            >
-              <Grid2X2 size={18} />
-            </button>
-            <button
-              onClick={() => setCardSize('large')}
-              className={`p-2 rounded-lg transition-colors ${cardSize === 'large' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Vista grande"
-            >
-              <LayoutGrid size={18} />
-            </button>
-          </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-soft p-3 max-h-[220px] overflow-y-auto">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pb-3">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={`flex items-start gap-2 px-3 py-2 rounded-xl transition-all min-w-0 ${
-                  selectedCategory === null
-                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
-                    : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
-                }`}
-                title="Todos"
-              >
-                <span className="flex-shrink-0">🏷️</span>
-                <span className="text-xs font-medium break-words leading-tight">Todos</span>
-              </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex items-start gap-2 px-3 py-2 rounded-xl transition-all min-w-0 ${
-                    selectedCategory === cat.id
-                      ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
-                      : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
-                  }`}
-                  title={cat.name}
-                >
-                  <span className="flex-shrink-0">{cat.imageUrl || '📦'}</span>
-                  <span className="text-xs font-medium break-words leading-tight">{cat.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <CategoriesPanel
+          cardSize={cardSize}
+          setCardSize={setCardSize}
+          categories={categories}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+        />
 
         {/* Products Grid */}
         <div className="flex-1 overflow-y-auto">
@@ -483,346 +923,53 @@ const POSPage = () => {
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-800">
-                Pago con {paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}
-              </h3>
-              <button 
-                onClick={() => setShowPaymentModal(false)} 
-                className="text-gray-400 hover:text-gray-600"
-                disabled={processing}
-              >
-                <X size={24} />
-              </button>
-            </div>
+      <PaymentModal
+        show={showPaymentModal}
+        paymentMethod={paymentMethod}
+        subtotal={subtotal}
+        discountAmount={discountAmount}
+        total={total}
+        amountReceived={amountReceived}
+        setAmountReceived={setAmountReceived}
+        processing={processing}
+        onClose={() => setShowPaymentModal(false)}
+        onConfirm={handleConfirmSale}
+        formatCurrency={formatCurrency}
+      />
 
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Descuento</span>
-                  <span>-{formatCurrency(discountAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total a pagar</span>
-                <span className="text-primary-600">{formatCurrency(total)}</span>
-              </div>
+      <CustomerSelectionModal
+        show={showCustomerModal}
+        customerId={customerId}
+        customerSearch={customerSearch}
+        setCustomerSearch={setCustomerSearch}
+        filteredCustomers={filteredCustomers}
+        onClose={() => {
+          setShowCustomerModal(false)
+          setCustomerSearch('')
+        }}
+        onSelectCustomer={selectCustomer}
+        onOpenNewCustomer={() => setShowNewCustomerModal(true)}
+      />
 
-              {paymentMethod === 'EFECTIVO' ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Monto recibido
-                    </label>
-                    <input
-                      type="number"
-                      value={amountReceived}
-                      onChange={(e) => setAmountReceived(e.target.value)}
-                      className="input-field"
-                      min={total}
-                    />
-                  </div>
-                  {parseFloat(amountReceived) >= total && (
-                    <div className="flex justify-between text-lg font-bold text-green-600">
-                      <span>Cambio</span>
-                      <span>{formatCurrency(parseFloat(amountReceived) - total)}</span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="p-4 bg-primary-50 rounded-xl text-center">
-                  <CreditCard className="w-12 h-12 mx-auto text-primary-600 mb-2" />
-                  <p className="text-sm text-gray-600">El pago se procesará con tarjeta</p>
-                  <p className="text-xs text-gray-400 mt-1">El monto exacto será cobrado al cliente</p>
-                </div>
-              )}
-            </div>
+      <NewCustomerModal
+        show={showNewCustomerModal}
+        newCustomerData={newCustomerData}
+        setNewCustomerData={setNewCustomerData}
+        savingCustomer={savingCustomer}
+        onClose={() => setShowNewCustomerModal(false)}
+        onCreate={handleCreateCustomer}
+      />
 
-            <div className="space-y-3">
-              <Button 
-                variant="primary" 
-                className="w-full" 
-                disabled={processing || (paymentMethod === 'EFECTIVO' && parseFloat(amountReceived) < total)}
-                onClick={async () => {
-                  setProcessing(true)
-                  try {
-                    const saleRequest = {
-                      customerId: customerId,
-                      paymentMethod: paymentMethod,
-                      discountPercent: discountType === 'percent' ? discount : 0,
-                      amountReceived: parseFloat(amountReceived),
-                      notes: notes,
-                      details: items.map(item => ({
-                        productId: item.id,
-                        quantity: item.quantity,
-                        unitPrice: item.price,
-                        discountAmount: 0
-                      }))
-                    }
-                    
-                    const result = await invoiceService.createSale(saleRequest)
-                    // Obtener detalle completo de la factura
-                    const invoiceDetail = await invoiceService.getById((result as any).id)
-                    setCompletedInvoice(invoiceDetail)
-                    dispatch(clearCart())
-                    setShowPaymentModal(false)
-                    setShowInvoiceConfirmModal(true)
-                    fetchData() // Refresh products to update stock
-                  } catch (error: any) {
-                    console.error('Error processing sale:', error)
-                    toast.error(error.response?.data?.message || 'Error al procesar la venta')
-                  } finally {
-                    setProcessing(false)
-                  }
-                }}
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  'Confirmar Venta'
-                )}
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="w-full" 
-                onClick={() => setShowPaymentModal(false)}
-                disabled={processing}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Customer Selection Modal */}
-      {showCustomerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] flex flex-col animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Seleccionar Cliente</h3>
-              <button 
-                onClick={() => {
-                  setShowCustomerModal(false)
-                  setCustomerSearch('')
-                }} 
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="relative mb-4">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Buscar por nombre, documento o teléfono..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                className="input-field pl-12"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2">
-              <button
-                onClick={() => selectCustomer(null)}
-                className={`w-full p-3 rounded-xl text-left transition-colors ${
-                  customerId === null ? 'bg-primary-100 border-2 border-primary-500' : 'bg-gray-50 hover:bg-primary-50'
-                }`}
-              >
-                <p className="font-medium text-gray-800">Cliente General</p>
-                <p className="text-sm text-gray-500">Sin datos de cliente</p>
-              </button>
-
-              {filteredCustomers.map((customer) => (
-                <button
-                  key={customer.id}
-                  onClick={() => selectCustomer(customer)}
-                  className={`w-full p-3 rounded-xl text-left transition-colors ${
-                    customerId === customer.id ? 'bg-primary-100 border-2 border-primary-500' : 'bg-gray-50 hover:bg-primary-50'
-                  }`}
-                >
-                  <p className="font-medium text-gray-800">{customer.fullName}</p>
-                  <p className="text-sm text-gray-500">
-                    {customer.documentType} {customer.documentNumber}
-                    {customer.phone && ` • ${customer.phone}`}
-                  </p>
-                </button>
-              ))}
-
-              {filteredCustomers.length === 0 && customerSearch && (
-                <div className="text-center py-8 text-gray-400">
-                  No se encontraron clientes
-                </div>
-              )}
-            </div>
-
-            {/* Botón Nuevo Cliente */}
-            <div className="mt-4 pt-4 border-t border-primary-100">
-              <button
-                onClick={() => setShowNewCustomerModal(true)}
-                className="w-full flex items-center justify-center gap-2 p-3 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 transition-colors"
-              >
-                <UserPlus size={20} />
-                <span className="font-medium">Crear Nuevo Cliente</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* New Customer Modal */}
-      {showNewCustomerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Nuevo Cliente</h3>
-              <button 
-                onClick={() => setShowNewCustomerModal(false)} 
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
-                <input
-                  type="text"
-                  value={newCustomerData.fullName}
-                  onChange={(e) => setNewCustomerData({ ...newCustomerData, fullName: e.target.value })}
-                  className="input-field"
-                  placeholder="Nombre del cliente"
-                  autoFocus
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Doc.</label>
-                  <select
-                    value={newCustomerData.documentType}
-                    onChange={(e) => setNewCustomerData({ ...newCustomerData, documentType: e.target.value })}
-                    className="input-field"
-                  >
-                    <option value="CC">CC</option>
-                    <option value="NIT">NIT</option>
-                    <option value="CE">CE</option>
-                    <option value="TI">TI</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
-                  <input
-                    type="text"
-                    value={newCustomerData.documentNumber}
-                    onChange={(e) => setNewCustomerData({ ...newCustomerData, documentNumber: e.target.value })}
-                    className="input-field"
-                    placeholder="Documento"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={newCustomerData.phone}
-                  onChange={(e) => setNewCustomerData({ ...newCustomerData, phone: e.target.value })}
-                  className="input-field"
-                  placeholder="Teléfono (opcional)"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowNewCustomerModal(false)}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateCustomer}
-                disabled={savingCustomer || !newCustomerData.fullName.trim()}
-                className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {savingCustomer ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus size={20} />}
-                {savingCustomer ? 'Guardando...' : 'Crear y Seleccionar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Invoice Confirmation Modal */}
-      {showInvoiceConfirmModal && completedInvoice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-800">¡Venta Completada!</h3>
-              <p className="text-gray-500 mt-1">Factura N° {completedInvoice.invoiceNumber}</p>
-            </div>
-
-            <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Cliente:</span>
-                <span className="font-medium">{completedInvoice.customer?.fullName || 'Cliente General'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Método:</span>
-                <span>{completedInvoice.paymentMethod}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Items:</span>
-                <span>{completedInvoice.details?.length || 0} productos</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
-                <span>Total:</span>
-                <span className="text-primary-600">{formatCurrency(completedInvoice.total)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={handlePrintInvoice}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors"
-              >
-                <Printer size={20} />
-                Imprimir Factura
-              </button>
-              <button
-                onClick={() => {
-                  setShowInvoiceConfirmModal(false)
-                  setCompletedInvoice(null)
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
-              >
-                <X size={20} />
-                Cerrar sin Imprimir
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InvoiceConfirmModal
+        show={showInvoiceConfirmModal}
+        completedInvoice={completedInvoice}
+        onPrint={handlePrintInvoice}
+        onClose={() => {
+          setShowInvoiceConfirmModal(false)
+          setCompletedInvoice(null)
+        }}
+        formatCurrency={formatCurrency}
+      />
     </div>
   )
 }
