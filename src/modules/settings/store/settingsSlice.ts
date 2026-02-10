@@ -1,4 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import { settingsService } from '@/core/api/settingsService'
 
 interface ThemeConfig {
   primaryColor: string
@@ -75,6 +76,61 @@ const defaultState: SettingsState = {
   isLoading: false,
 }
 
+// Map backend CompanyConfig entity to frontend state
+const mapBackendToState = (data: any): Partial<SettingsState> => ({
+  theme: {
+    primaryColor: data.primaryColor || defaultState.theme.primaryColor,
+    secondaryColor: data.secondaryColor || defaultState.theme.secondaryColor,
+    accentColor: data.accentColor || defaultState.theme.accentColor,
+    backgroundColor: data.backgroundColor || defaultState.theme.backgroundColor,
+    cardColor: data.cardColor || defaultState.theme.cardColor,
+    sidebarColor: data.sidebarColor || defaultState.theme.sidebarColor,
+  },
+  company: {
+    companyName: data.companyName || defaultState.company.companyName,
+    legalName: data.legalName || '',
+    taxId: data.taxId || '',
+    logoUrl: data.logoUrl || '',
+    currency: data.currency || 'COP',
+    taxRate: data.taxRate != null ? Number(data.taxRate) : 19,
+    address: data.address || '',
+    phone: data.phone || '',
+    email: data.email || '',
+  },
+  businessType: data.businessType || 'GENERAL',
+})
+
+// Async thunk: fetch settings from backend
+export const fetchSettings = createAsyncThunk('settings/fetch', async () => {
+  const res = await settingsService.getConfig()
+  return res as any
+})
+
+// Async thunk: save settings to backend
+export const saveSettingsToBackend = createAsyncThunk('settings/save', async (_, { getState }) => {
+  const state = (getState() as any).settings as SettingsState
+  const payload = {
+    companyName: state.company.companyName,
+    legalName: state.company.legalName,
+    taxId: state.company.taxId,
+    logoUrl: state.company.logoUrl,
+    primaryColor: state.theme.primaryColor,
+    secondaryColor: state.theme.secondaryColor,
+    accentColor: state.theme.accentColor,
+    backgroundColor: state.theme.backgroundColor,
+    cardColor: state.theme.cardColor,
+    sidebarColor: state.theme.sidebarColor,
+    businessType: state.businessType,
+    currency: state.company.currency,
+    taxRate: state.company.taxRate,
+    address: state.company.address,
+    phone: state.company.phone,
+    email: state.company.email,
+  }
+  const res = await settingsService.updateConfig(payload)
+  return res as any
+})
+
 const savedState = loadFromStorage()
 const initialState: SettingsState = {
   ...defaultState,
@@ -108,6 +164,30 @@ const settingsSlice = createSlice({
       state.theme = defaultState.theme
       saveToStorage(state)
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchSettings.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(fetchSettings.fulfilled, (state, action) => {
+        const mapped = mapBackendToState(action.payload)
+        state.theme = { ...state.theme, ...mapped.theme }
+        state.company = { ...state.company, ...mapped.company }
+        state.businessType = mapped.businessType || state.businessType
+        state.isLoading = false
+        saveToStorage(state)
+      })
+      .addCase(fetchSettings.rejected, (state) => {
+        state.isLoading = false
+      })
+      .addCase(saveSettingsToBackend.fulfilled, (state, action) => {
+        const mapped = mapBackendToState(action.payload)
+        state.theme = { ...state.theme, ...mapped.theme }
+        state.company = { ...state.company, ...mapped.company }
+        state.businessType = mapped.businessType || state.businessType
+        saveToStorage(state)
+      })
   },
 })
 

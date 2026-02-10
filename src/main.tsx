@@ -8,8 +8,6 @@ import { store } from './app/store'
 import ErrorBoundary from './shared/components/ErrorBoundary'
 import './shared/styles/globals.css'
 
-console.log('App iniciando...')
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>

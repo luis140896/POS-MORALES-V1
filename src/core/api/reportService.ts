@@ -54,6 +54,16 @@ export interface InventorySummary {
   totalSaleValue: number
 }
 
+// Dashboard endpoints — accessible to ALL authenticated users
+export const dashboardService = {
+  getSalesSummary: (startDate: string, endDate: string) =>
+    api.get<SalesSummary>(`/dashboard/sales/summary?start=${startDate}&end=${endDate}`),
+
+  getDailySales: (startDate: string, endDate: string) =>
+    api.get<DailySale[]>(`/dashboard/sales/daily?startDate=${startDate.split('T')[0]}&endDate=${endDate.split('T')[0]}`),
+}
+
+// Report endpoints — restricted to ADMIN, SUPERVISOR, REPORTES
 export const reportService = {
   getSalesSummary: (startDate: string, endDate: string) =>
     api.get<SalesSummary>(`/reports/sales/summary?start=${startDate}&end=${endDate}`),

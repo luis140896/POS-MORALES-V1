@@ -1,14 +1,14 @@
 import { useSelector, useDispatch } from 'react-redux'
-import { Save, Palette, Building2, Receipt, Check, RotateCcw, Upload, Trash2, Image } from 'lucide-react'
+import { Save, Palette, Building2, Receipt, Check, RotateCcw, Upload, Trash2, Image, Loader2 } from 'lucide-react'
 import { useState, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { RootState } from '@/app/store'
-import { setTheme, setCompany, setBusinessType, resetTheme } from '../store/settingsSlice'
+import { RootState, AppDispatch } from '@/app/store'
+import { setTheme, setCompany, setBusinessType, resetTheme, saveSettingsToBackend } from '../store/settingsSlice'
 import Button from '@/shared/components/ui/Button'
 import Input from '@/shared/components/ui/Input'
 
 const SettingsPage = () => {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const { theme, company, businessType } = useSelector((state: RootState) => state.settings)
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -107,10 +107,25 @@ const SettingsPage = () => {
     }
   }
 
-  const handleSave = () => {
-    setSaved(true)
-    toast.success('Configuración guardada correctamente')
-    setTimeout(() => setSaved(false), 2000)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (Object.keys(errors).length > 0) {
+      toast.error('Corrige los errores antes de guardar')
+      return
+    }
+    setSaving(true)
+    try {
+      await dispatch(saveSettingsToBackend()).unwrap()
+      setSaved(true)
+      toast.success('Configuración guardada en el servidor')
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error: any) {
+      console.error('Error saving settings:', error)
+      toast.error('Error al guardar configuración en el servidor')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -120,8 +135,8 @@ const SettingsPage = () => {
           <h1 className="text-2xl font-bold text-gray-800">Configuración</h1>
           <p className="text-gray-500">Personaliza tu sistema POS (los cambios se guardan automáticamente)</p>
         </div>
-        <Button variant="primary" onClick={handleSave}>
-          {saved ? <><Check size={20} /> Guardado</> : <><Save size={20} /> Guardar Cambios</>}
+        <Button variant="primary" onClick={handleSave} disabled={saving}>
+          {saving ? <><Loader2 size={20} className="animate-spin" /> Guardando...</> : saved ? <><Check size={20} /> Guardado</> : <><Save size={20} /> Guardar Cambios</>}
         </Button>
       </div>
 

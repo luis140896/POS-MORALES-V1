@@ -8,12 +8,20 @@ import { invoiceService } from '@/core/api/invoiceService'
 import { RootState } from '@/app/store'
 import XLSX from 'xlsx-js-style'
 
+// Helper: local date as YYYY-MM-DD (avoids UTC shift from toISOString)
+const toLocalDateStr = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 const ReportsPage = () => {
   const { theme, company } = useSelector((state: RootState) => state.settings)
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setDate(1)).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+    start: toLocalDateStr(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+    end: toLocalDateStr(new Date())
   })
   const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null)
   const [topProducts, setTopProducts] = useState<TopProduct[]>([])
@@ -92,8 +100,8 @@ const ReportsPage = () => {
     }
 
     setDateRange({
-      start: start.toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
+      start: toLocalDateStr(start),
+      end: toLocalDateStr(new Date())
     })
   }
 

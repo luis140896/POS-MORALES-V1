@@ -231,7 +231,8 @@ const InventoryPage = () => {
       { wch: 12 }, // Estado
     ]
 
-    const date = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     XLSX.writeFile(wb, `inventario_${date}.xlsx`)
     toast.success('Inventario exportado correctamente')
   }

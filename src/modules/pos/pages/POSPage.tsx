@@ -738,44 +738,53 @@ const POSPage = () => {
 
   const selectedTable = tables.find(t => t.id === selectedTableId) || null
 
-  const handleConfirmSale = async () => {
+  // Send cart items to a table WITHOUT paying (save order and continue)
+  const handleSendToTable = async () => {
+    if (!selectedTableId || !selectedTable || items.length === 0) return
     setProcessing(true)
     try {
-      // If a table is selected and it's available, open table + add items + pay via table flow
-      if (selectedTableId && selectedTable && selectedTable.status === 'DISPONIBLE') {
-        // Open table
+      const tableItems = {
+        items: items.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          unitPrice: item.price,
+        }))
+      }
+
+      if (selectedTable.status === 'DISPONIBLE') {
         await tableService.openTable(selectedTableId, {
           guestCount: 1,
           customerId: customerId,
         })
+      }
 
-        // Add items
-        await tableService.addItems(selectedTableId, {
-          items: items.map(item => ({
-            productId: item.id,
-            quantity: item.quantity,
-            unitPrice: item.price,
-          }))
-        })
+      await tableService.addItems(selectedTableId, tableItems)
 
-        // Pay table
-        const result = await tableService.payTable(selectedTableId, {
-          paymentMethod: paymentMethod,
-          amountReceived: parseFloat(amountReceived),
-          discountPercent: discountType === 'percent' ? discount : 0,
-          notes: notes || undefined,
-        })
+      toast.success(`Pedido enviado a Mesa #${selectedTable.tableNumber}`)
+      dispatch(clearCart())
+      setSelectedTableId(null)
+      fetchData()
+      fetchTables()
+    } catch (error: any) {
+      console.error('Error sending to table:', error)
+      toast.error(error.response?.data?.message || 'Error al enviar pedido a mesa')
+    } finally {
+      setProcessing(false)
+    }
+  }
 
-        const invoiceDetail = await invoiceService.getById((result as any).id)
-        setCompletedInvoice(invoiceDetail)
-        dispatch(clearCart())
-        setSelectedTableId(null)
-        setShowPaymentModal(false)
-        setShowInvoiceConfirmModal(true)
-        fetchData()
-        fetchTables()
-      } else if (selectedTableId && selectedTable && selectedTable.status === 'OCUPADA') {
-        // Table already occupied: add items to existing session and pay
+  const handleConfirmSale = async () => {
+    setProcessing(true)
+    try {
+      if (selectedTableId && selectedTable && (selectedTable.status === 'DISPONIBLE' || selectedTable.status === 'OCUPADA')) {
+        // Table flow: open if needed, add items, then pay
+        if (selectedTable.status === 'DISPONIBLE') {
+          await tableService.openTable(selectedTableId, {
+            guestCount: 1,
+            customerId: customerId,
+          })
+        }
+
         await tableService.addItems(selectedTableId, {
           items: items.map(item => ({
             productId: item.id,
@@ -1155,6 +1164,16 @@ const POSPage = () => {
               Tarjeta
             </Button>
           </div>
+          {items.length > 0 && selectedTableId && selectedTable && (
+            <button
+              onClick={handleSendToTable}
+              disabled={processing}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors font-medium disabled:opacity-50"
+            >
+              {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <UtensilsCrossed size={20} />}
+              Enviar a Mesa #{selectedTable.tableNumber}
+            </button>
+          )}
           {items.length > 0 && (
             <Button 
               variant="secondary"

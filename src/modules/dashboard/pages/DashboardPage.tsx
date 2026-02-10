@@ -14,8 +14,16 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { invoiceService } from '@/core/api/invoiceService'
 import { inventoryService } from '@/core/api/inventoryService'
-import { reportService } from '@/core/api/reportService'
+import { dashboardService } from '@/core/api/reportService'
 import { Inventory } from '@/types'
+
+// Helper: local date as YYYY-MM-DD (avoids UTC shift from toISOString)
+const toLocalDateStr = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 interface DailySale {
   date: string
@@ -41,8 +49,8 @@ const DashboardPage = () => {
   const [chartLoading, setChartLoading] = useState(true)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [dateRange, setDateRange] = useState({
-    start: new Date().toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
+    start: toLocalDateStr(new Date()),
+    end: toLocalDateStr(new Date()),
   })
 
   useEffect(() => {
@@ -68,7 +76,7 @@ const DashboardPage = () => {
         setSummaryLoading(true)
         const startDateTime = `${dateRange.start}T00:00:00`
         const endDateTime = `${dateRange.end}T23:59:59`
-        const res = await reportService.getSalesSummary(startDateTime, endDateTime)
+        const res = await dashboardService.getSalesSummary(startDateTime, endDateTime)
         const summary = res as any
         const totalSales = Number(summary?.totalSales ?? 0)
         const salesCount = Number(summary?.salesCount ?? 0)
@@ -101,7 +109,7 @@ const DashboardPage = () => {
         const startDate = new Date(`${dateRange.start}T00:00:00`)
         const endDate = new Date(`${dateRange.end}T00:00:00`)
 
-        const res = await reportService.getDailySales(
+        const res = await dashboardService.getDailySales(
           startDate.toISOString(),
           endDate.toISOString()
         )
@@ -212,7 +220,7 @@ const DashboardPage = () => {
           <div className="flex gap-2">
             <button
               onClick={() => {
-                const d = new Date().toISOString().split('T')[0]
+                const d = toLocalDateStr(new Date())
                 setDateRange({ start: d, end: d })
               }}
               className="btn-ghost text-sm"
@@ -225,8 +233,8 @@ const DashboardPage = () => {
                 const start = new Date()
                 start.setDate(start.getDate() - 7)
                 setDateRange({
-                  start: start.toISOString().split('T')[0],
-                  end: end.toISOString().split('T')[0],
+                  start: toLocalDateStr(start),
+                  end: toLocalDateStr(end),
                 })
               }}
               className="btn-ghost text-sm"
@@ -238,8 +246,8 @@ const DashboardPage = () => {
                 const now = new Date()
                 const start = new Date(now.getFullYear(), now.getMonth(), 1)
                 setDateRange({
-                  start: start.toISOString().split('T')[0],
-                  end: new Date().toISOString().split('T')[0],
+                  start: toLocalDateStr(start),
+                  end: toLocalDateStr(new Date()),
                 })
               }}
               className="btn-ghost text-sm"
@@ -251,8 +259,8 @@ const DashboardPage = () => {
                 const now = new Date()
                 const start = new Date(now.getFullYear(), 0, 1)
                 setDateRange({
-                  start: start.toISOString().split('T')[0],
-                  end: new Date().toISOString().split('T')[0],
+                  start: toLocalDateStr(start),
+                  end: toLocalDateStr(new Date()),
                 })
               }}
               className="btn-ghost text-sm"

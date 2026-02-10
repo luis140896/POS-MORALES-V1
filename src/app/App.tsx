@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { RootState } from './store'
+import { useSelector, useDispatch } from 'react-redux'
+import { RootState, AppDispatch } from './store'
+import { fetchSettings } from '@/modules/settings/store/settingsSlice'
 import MainLayout from '@/shared/components/layout/MainLayout'
 import LoginPage from '@/modules/auth/pages/LoginPage'
 import DashboardPage from '@/modules/dashboard/pages/DashboardPage'
@@ -45,8 +46,16 @@ const hexToHSL = (hex: string): { h: number; s: number; l: number } => {
 }
 
 function App() {
+  const dispatch = useDispatch<AppDispatch>()
   const { isAuthenticated } = useSelector((state: RootState) => state.auth)
   const { theme } = useSelector((state: RootState) => state.settings)
+
+  // Fetch settings from backend when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchSettings())
+    }
+  }, [isAuthenticated, dispatch])
 
   // Aplicar colores del tema dinámicamente
   useEffect(() => {
