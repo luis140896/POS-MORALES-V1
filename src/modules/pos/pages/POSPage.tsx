@@ -365,14 +365,14 @@ const CategoriesPanel = ({
         )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-soft p-3 h-auto max-h-[220px] overflow-y-auto inline-block w-fit max-w-full">
-        <div className="flex flex-wrap gap-2 pb-3">
+      <div className="bg-white rounded-2xl shadow-soft p-3 h-auto max-h-[220px] overflow-y-auto inline-block w-fit max-w-full border border-gray-100">
+        <div className="flex flex-wrap gap-3 pb-3">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={`inline-flex items-start gap-2 px-3 py-2 rounded-xl transition-all w-auto max-w-full ${
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all border ${
               selectedCategory === null
-                ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
-                : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
+                ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft border-primary-600'
+                : 'bg-white text-gray-700 hover:bg-primary-50 border-gray-200 hover:border-primary-300'
             }`}
             title="Todos"
           >
@@ -404,10 +404,10 @@ const CategoriesPanel = ({
                 onReorderCategory(draggingCategoryId, cat.id)
                 setDraggingCategoryId(null)
               }}
-              className={`inline-flex items-start gap-2 px-3 py-2 rounded-xl transition-all w-auto max-w-full ${
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all border ${
                 selectedCategory === cat.id
-                  ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
-                  : 'bg-primary-50 text-gray-700 hover:bg-primary-100'
+                  ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft border-primary-600'
+                  : 'bg-white text-gray-700 hover:bg-primary-50 border-gray-200 hover:border-primary-300'
               }`}
               title={cat.name}
             >
@@ -866,29 +866,36 @@ const POSPage = () => {
                       }))
                     }}
                     disabled={stock === 0}
-                    className={`card hover:scale-[1.02] border-2 p-4 text-left transition-all ${
+                    className={`bg-white rounded-2xl shadow-sm hover:shadow-md border border-gray-200 p-4 text-left transition-all duration-200 ${
                       stock === 0 
-                        ? 'opacity-50 cursor-not-allowed border-gray-200' 
-                        : 'hover:border-primary-300 border-transparent'
-                    }`}
+                        ? 'opacity-50 cursor-not-allowed' 
+                        : 'hover:border-primary-300 hover:scale-[1.02]'
+                    } ${cartQty > 0 ? 'ring-2 ring-primary-200 border-primary-300' : ''}`}
                   >
-                    <div className="w-full h-20 bg-primary-50 rounded-xl mb-3 flex items-center justify-center text-3xl">
+                    <div className="w-full h-24 bg-gradient-to-br from-primary-50 to-gray-50 rounded-xl mb-3 flex items-center justify-center text-3xl overflow-hidden">
                       {product.imageUrl ? (
                         <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-xl" />
                       ) : '📦'}
                     </div>
-                    <p className="text-xs text-gray-400 mb-1">{product.code}</p>
-                    <p className="font-medium text-gray-800 text-sm line-clamp-2 mb-2">{product.name}</p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-primary-600 font-bold">{formatCurrency(product.salePrice)}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        stock === 0 ? 'bg-red-100 text-red-600' :
-                        stock <= (product.inventory?.minStock || 5) ? 'bg-amber-100 text-amber-600' :
-                        'bg-green-100 text-green-600'
+                    <p className="text-[11px] text-gray-400 mb-0.5 font-mono">{product.code}</p>
+                    <p className="font-semibold text-gray-800 text-sm line-clamp-2 mb-2 leading-snug">{product.name}</p>
+                    <div className="flex items-center justify-between mt-auto">
+                      <p className="text-primary-600 font-bold text-base">{formatCurrency(product.salePrice)}</p>
+                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${
+                        stock === 0 ? 'bg-red-100 text-red-700 border border-red-200' :
+                        stock <= (product.inventory?.minStock || 5) ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                        'bg-green-50 text-green-700 border border-green-200'
                       }`}>
                         {stock === 0 ? 'Agotado' : `${stock} uds`}
                       </span>
                     </div>
+                    {cartQty > 0 && (
+                      <div className="mt-2 flex items-center justify-center">
+                        <span className="text-xs bg-primary-100 text-primary-700 px-2.5 py-0.5 rounded-full font-semibold">
+                          {cartQty} en carrito
+                        </span>
+                      </div>
+                    )}
                   </button>
                 )
               })}

@@ -14,6 +14,7 @@ import CustomersPage from '@/modules/customers/pages/CustomersPage'
 import ReportsPage from '@/modules/reports/pages/ReportsPage'
 import UsersPage from '@/modules/users/pages/UsersPage'
 import SettingsPage from '@/modules/settings/pages/SettingsPage'
+import TablesPage from '@/modules/tables/pages/TablesPage'
 import ProtectedRoute from '@/core/auth/ProtectedRoute'
 import RoleGuard from '@/core/auth/RoleGuard'
 
@@ -98,6 +99,14 @@ function App() {
             element={
               <RoleGuard allowedRoles={['ADMIN', 'CAJERO', 'SUPERVISOR']}>
                 <POSPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/tables"
+            element={
+              <RoleGuard allowedRoles={['ADMIN', 'CAJERO', 'SUPERVISOR', 'MESERO']}>
+                <TablesPage />
               </RoleGuard>
             }
           />

@@ -138,6 +138,59 @@ export interface User {
   updatedAt?: string
 }
 
+// ==================== Tables ====================
+
+export interface RestaurantTable {
+  id: number
+  tableNumber: number
+  name: string
+  capacity: number
+  status: 'DISPONIBLE' | 'OCUPADA' | 'RESERVADA' | 'FUERA_DE_SERVICIO'
+  zone: string
+  displayOrder: number
+  isActive: boolean
+  activeSession?: TableSession | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TableSession {
+  id: number
+  tableId: number
+  tableNumber: number
+  tableName: string
+  invoiceId?: number
+  invoiceNumber?: string
+  openedByName: string
+  openedById: number
+  closedByName?: string
+  openedAt: string
+  closedAt?: string
+  guestCount: number
+  notes?: string
+  status: 'ABIERTA' | 'CERRADA' | 'TRANSFERIDA'
+  subtotal?: number
+  total?: number
+  itemCount?: number
+  invoice?: Invoice
+}
+
+// ==================== Notifications ====================
+
+export interface Notification {
+  id: number
+  type: string
+  title: string
+  message: string
+  severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
+  targetRoles: string[]
+  referenceType?: string
+  referenceId?: number
+  isRead: boolean
+  readAt?: string
+  createdAt: string
+}
+
 export interface PaginatedResponse<T> {
   content: T[]
   totalElements: number
