@@ -18,7 +18,9 @@ import {
 
 interface SidebarProps {
   isOpen: boolean
+  isMobile?: boolean
   onToggle: () => void
+  onClose?: () => void
 }
 
 const menuItems = [
@@ -35,7 +37,7 @@ const menuItems = [
   { path: '/settings', icon: Settings, label: 'Configuración', allowedRoles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
-const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
+const Sidebar = ({ isOpen, isMobile = false, onToggle, onClose }: SidebarProps) => {
   const { company } = useSelector((state: RootState) => state.settings)
   const { user } = useSelector((state: RootState) => state.auth)
 
@@ -45,10 +47,15 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
     return role ? item.allowedRoles.includes(role) : false
   }
 
+  // On mobile: always show labels when open, slide from left
+  const showLabels = isMobile ? isOpen : isOpen
+
   return (
     <aside
       className={`fixed left-0 top-0 h-full shadow-soft z-30 transition-all duration-300 ${
-        isOpen ? 'w-64' : 'w-20'
+        isMobile
+          ? `w-64 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+          : (isOpen ? 'w-64' : 'w-20')
       }`}
       style={{ backgroundColor: 'var(--color-sidebar, #ffffff)' }}
     >
@@ -56,7 +63,7 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-primary-100">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl flex items-center justify-center shadow-soft overflow-hidden">
+            <div className="w-10 h-10 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl flex items-center justify-center shadow-soft overflow-hidden flex-shrink-0">
               {company.logoUrl ? (
                 <img
                   src={company.logoUrl}
@@ -67,18 +74,20 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
                 <Store className="w-5 h-5 text-white" />
               )}
             </div>
-            {isOpen && (
+            {showLabels && (
               <span className="font-bold text-gray-800 truncate">
                 {company.companyName}
               </span>
             )}
           </div>
-          <button
-            onClick={onToggle}
-            className="p-2 rounded-lg hover:bg-primary-50 text-gray-500 transition-colors"
-          >
-            <ChevronLeft className={`w-5 h-5 transition-transform ${!isOpen ? 'rotate-180' : ''}`} />
-          </button>
+          {!isMobile && (
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-lg hover:bg-primary-50 text-gray-500 transition-colors"
+            >
+              <ChevronLeft className={`w-5 h-5 transition-transform ${!isOpen ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -88,8 +97,9 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
               <li key={item.path}>
                 <NavLink
                   to={item.path}
+                  onClick={() => isMobile && onClose?.()}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 touch-target ${
                       isActive
                         ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
                         : 'text-gray-600 hover:bg-primary-50 hover:text-primary-700'
@@ -97,7 +107,7 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
                   }
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
-                  {isOpen && <span className="truncate">{item.label}</span>}
+                  {showLabels && <span className="truncate">{item.label}</span>}
                 </NavLink>
               </li>
             ))}
@@ -105,7 +115,7 @@ const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
         </nav>
 
         {/* Footer */}
-        {isOpen && (
+        {showLabels && (
           <div className="p-4 border-t border-primary-100">
             <p className="text-xs text-gray-400 text-center">
               POS Morales v1.0.0

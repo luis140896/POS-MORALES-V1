@@ -394,40 +394,40 @@ const ReportsPage = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
-          <p className="text-gray-500">Análisis y estadísticas de tu negocio</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Reportes</h1>
+          <p className="text-sm sm:text-base text-gray-500">Análisis y estadísticas de tu negocio</p>
         </div>
       </div>
 
       {/* Date Filter */}
       <div className="card">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-gray-400" />
+        <div className="flex flex-wrap gap-3 sm:gap-4 items-center">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Calendar size={20} className="text-gray-400 hidden sm:block" />
             <input
               type="date"
-              className="input-field"
+              className="input-field flex-1 sm:flex-none"
               value={dateRange.start}
               onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
             />
             <span className="text-gray-400">a</span>
             <input
               type="date"
-              className="input-field"
+              className="input-field flex-1 sm:flex-none"
               value={dateRange.end}
               onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={() => setQuickDate('today')} className="btn-ghost text-sm">Hoy</button>
-            <button onClick={() => setQuickDate('week')} className="btn-ghost text-sm">Esta Semana</button>
-            <button onClick={() => setQuickDate('month')} className="btn-ghost text-sm">Este Mes</button>
-            <button onClick={() => setQuickDate('year')} className="btn-ghost text-sm">Este Año</button>
+            <button onClick={() => setQuickDate('week')} className="btn-ghost text-sm">Semana</button>
+            <button onClick={() => setQuickDate('month')} className="btn-ghost text-sm">Mes</button>
+            <button onClick={() => setQuickDate('year')} className="btn-ghost text-sm">Año</button>
           </div>
-          <Button variant="primary" size="sm" onClick={exportToExcel}><Download size={18} /> Exportar Excel</Button>
+          <Button variant="primary" size="sm" onClick={exportToExcel}><Download size={18} /> Exportar</Button>
         </div>
       </div>
 
@@ -438,48 +438,48 @@ const ReportsPage = () => {
       ) : (
         <>
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
             <div className="card">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-green-500 to-green-600 flex items-center justify-center shadow-soft">
-                  <DollarSign className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-green-500 to-green-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Ventas Totales</p>
-                  <p className="text-xl font-bold text-gray-800">{formatCurrency(salesSummary?.totalSales || 0)}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Ventas Totales</p>
+                  <p className="text-base sm:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.totalSales || 0)}</p>
                 </div>
               </div>
             </div>
             <div className="card">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center shadow-soft">
-                  <BarChart3 className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <BarChart3 className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Transacciones</p>
-                  <p className="text-xl font-bold text-gray-800">{(salesSummary as any)?.salesCount || (salesSummary as any)?.totalTransactions || 0}</p>
-                </div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center shadow-soft">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Ticket Promedio</p>
-                  <p className="text-xl font-bold text-gray-800">{formatCurrency(salesSummary?.averageTicket || 0)}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Transacciones</p>
+                  <p className="text-base sm:text-xl font-bold text-gray-800">{(salesSummary as any)?.salesCount || (salesSummary as any)?.totalTransactions || 0}</p>
                 </div>
               </div>
             </div>
             <div className="card">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center shadow-soft">
-                  <DollarSign className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Ganancia Neta</p>
-                  <p className="text-xl font-bold text-gray-800">{formatCurrency(salesSummary?.grossProfit || salesSummary?.totalProfit || 0)}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Ticket Promedio</p>
+                  <p className="text-base sm:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.averageTicket || 0)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Ganancia Neta</p>
+                  <p className="text-base sm:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.grossProfit || salesSummary?.totalProfit || 0)}</p>
                 </div>
               </div>
             </div>
@@ -487,7 +487,7 @@ const ReportsPage = () => {
 
           {/* Inventory Summary */}
           {inventorySummary && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
               <div className="card">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-center shadow-soft">
@@ -582,7 +582,7 @@ const ReportsPage = () => {
             {paymentMethods.length === 0 ? (
               <p className="text-gray-400 text-center py-4">Sin datos para el período</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 {paymentMethods.map((method) => (
                   <div key={method.paymentMethod} className="p-4 bg-primary-50 rounded-xl">
                     <div className="flex items-center gap-3 mb-2">

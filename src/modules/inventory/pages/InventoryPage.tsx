@@ -403,11 +403,11 @@ const InventoryPage = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Inventario</h1>
-          <p className="text-gray-500">Control y gestión de stock</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Inventario</h1>
+          <p className="text-sm sm:text-base text-gray-500">Control y gestión de stock</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={downloadTemplate}>
@@ -433,7 +433,7 @@ const InventoryPage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-3 sm:gap-6">
         <div className="card flex items-center gap-4">
           <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
             <Package className="w-6 h-6 text-primary-600" />
@@ -562,8 +562,8 @@ const InventoryPage = () => {
 
       {/* Edit Product Modal */}
       {showEditModal && editingItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl animate-scale-in my-8">
+        <div className="modal-overlay">
+          <div className="modal-content p-4 sm:p-6 max-w-2xl animate-scale-in">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-800">Editar Producto</h3>
               <button onClick={() => { setShowEditModal(false); setEditingItem(null) }} className="text-gray-400 hover:text-gray-600">
@@ -697,8 +697,8 @@ const InventoryPage = () => {
 
       {/* Adjust Modal */}
       {adjustModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="modal-overlay">
+          <div className="modal-content p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-gray-800">
                 {adjustModal.type === 'add' ? 'Entrada de Stock' : 'Salida de Stock'}

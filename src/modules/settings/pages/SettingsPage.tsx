@@ -129,18 +129,18 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Configuración</h1>
-          <p className="text-gray-500">Personaliza tu sistema POS (los cambios se guardan automáticamente)</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Configuración</h1>
+          <p className="text-sm sm:text-base text-gray-500">Personaliza tu sistema POS</p>
         </div>
         <Button variant="primary" onClick={handleSave} disabled={saving}>
           {saving ? <><Loader2 size={20} className="animate-spin" /> Guardando...</> : saved ? <><Check size={20} /> Guardado</> : <><Save size={20} /> Guardar Cambios</>}
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Company Info */}
         <div className="card">
           <div className="flex items-center gap-3 mb-6">

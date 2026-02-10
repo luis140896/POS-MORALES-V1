@@ -182,13 +182,13 @@ const DashboardPage = () => {
     },
   ]
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-gray-500">Resumen de tu negocio</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-500">Resumen de tu negocio</p>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-xs sm:text-sm text-gray-500">
           {new Date().toLocaleDateString('es-CO', { 
             weekday: 'long', 
             year: 'numeric', 
@@ -200,24 +200,24 @@ const DashboardPage = () => {
 
       {/* Date Filter */}
       <div className="card">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-gray-400" />
+        <div className="flex flex-wrap gap-3 sm:gap-4 items-center">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Calendar size={20} className="text-gray-400 hidden sm:block" />
             <input
               type="date"
-              className="input-field"
+              className="input-field flex-1 sm:flex-none"
               value={dateRange.start}
               onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
             />
             <span className="text-gray-400">a</span>
             <input
               type="date"
-              className="input-field"
+              className="input-field flex-1 sm:flex-none"
               value={dateRange.end}
               onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
                 const d = toLocalDateStr(new Date())
@@ -272,16 +272,16 @@ const DashboardPage = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat) => (
           <div key={stat.label} className="card hover:scale-[1.02] cursor-pointer">
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-500 mb-1 truncate">{stat.label}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-800 truncate">{stat.value}</p>
               </div>
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center shadow-soft`}>
-                <stat.icon className="w-6 h-6 text-white" />
+              <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center shadow-soft flex-shrink-0 ml-2`}>
+                <stat.icon className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
             </div>
             <div className={`flex items-center gap-1 mt-3 text-sm ${stat.isPositive ? 'text-green-600' : 'text-red-600'}`}>

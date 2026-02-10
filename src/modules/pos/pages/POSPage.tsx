@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, Grid3X3, LayoutGrid, Grid2X2, UtensilsCrossed } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, Grid3X3, LayoutGrid, Grid2X2, UtensilsCrossed, ShoppingCart } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
 import { addItem, removeItem, incrementQuantity, decrementQuantity, clearCart, setCustomer, selectCartTotal } from '../store/cartSlice'
@@ -34,8 +34,8 @@ const InvoiceConfirmModal = ({
   if (!show || !completedInvoice) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+    <div className="modal-overlay">
+      <div className="modal-content p-6 animate-scale-in">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,8 +110,8 @@ const CustomerSelectionModal = ({
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] flex flex-col animate-scale-in">
+    <div className="modal-overlay">
+      <div className="modal-content p-6 flex flex-col animate-scale-in">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-gray-800">Seleccionar Cliente</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -202,8 +202,8 @@ const NewCustomerModal = ({
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+    <div className="modal-overlay" style={{ zIndex: 60 }}>
+      <div className="modal-content p-6 animate-scale-in">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-gray-800">Nuevo Cliente</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -313,9 +313,9 @@ const CategoriesPanel = ({
   const [draggingCategoryId, setDraggingCategoryId] = useState<number | null>(null)
 
   return (
-    <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
+    <div className="flex flex-col gap-2 mb-3 lg:mb-4 flex-shrink-0">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1 bg-white rounded-xl p-1 flex-shrink-0">
+        <div className="hidden sm:flex gap-1 bg-white rounded-xl p-1 flex-shrink-0">
           <button
             onClick={() => setCardSize('small')}
             className={`p-2 rounded-lg transition-colors ${cardSize === 'small' ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}
@@ -366,8 +366,8 @@ const CategoriesPanel = ({
         )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-soft p-3 h-auto max-h-[220px] overflow-y-auto inline-block w-fit max-w-full border border-gray-100">
-        <div className="flex flex-wrap gap-3 pb-3">
+      <div className="bg-white rounded-2xl shadow-soft p-2 sm:p-3 h-auto max-h-[120px] sm:max-h-[220px] overflow-y-auto overflow-x-auto w-full border border-gray-100">
+        <div className="flex flex-nowrap sm:flex-wrap gap-2 sm:gap-3 pb-1 sm:pb-3">
           <button
             onClick={() => setSelectedCategory(null)}
             className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all border ${
@@ -452,8 +452,8 @@ const PaymentModal = ({
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+    <div className="modal-overlay">
+      <div className="modal-content p-6 animate-scale-in">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-gray-800">
             Pago con {paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}
@@ -564,6 +564,7 @@ const POSPage = () => {
   const [tables, setTables] = useState<RestaurantTable[]>([])
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null)
   const [showTableSelector, setShowTableSelector] = useState(false)
+  const [showMobileCart, setShowMobileCart] = useState(false)
 
   const [isOrganizingCategories, setIsOrganizingCategories] = useState(false)
   const [draftCategoryOrder, setDraftCategoryOrder] = useState<number[] | null>(null)
@@ -704,9 +705,9 @@ const POSPage = () => {
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
 
   const gridClasses = {
-    small: 'grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
-    medium: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-    large: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+    small: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+    medium: 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+    large: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
   }
 
   const handleCreateCustomer = async () => {
@@ -890,11 +891,11 @@ const POSPage = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] flex flex-col lg:flex-row gap-6 animate-fade-in overflow-hidden overflow-x-hidden">
+    <div className="min-h-[calc(100vh-5rem)] sm:min-h-[calc(100vh-6rem)] lg:h-[calc(100vh-7rem)] flex flex-col lg:flex-row gap-3 lg:gap-6 animate-fade-in overflow-auto">
       {/* Left Panel - Products */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Search */}
-        <div className="relative mb-3 max-w-md">
+        <div className="relative mb-3 max-w-full lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
@@ -991,20 +992,53 @@ const POSPage = () => {
         </div>
       </div>
 
-      {/* Right Panel - Cart (FIXED) */}
-      <div className="w-full lg:w-96 flex-shrink-0 bg-white rounded-2xl shadow-soft flex flex-col min-w-0">
+      {/* Mobile Cart FAB */}
+      <button
+        onClick={() => setShowMobileCart(true)}
+        className="lg:hidden fixed bottom-4 right-4 z-40 w-14 h-14 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+      >
+        <ShoppingCart size={22} />
+        {itemCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+            {itemCount}
+          </span>
+        )}
+      </button>
+
+      {/* Mobile Cart Backdrop */}
+      {showMobileCart && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileCart(false)} />
+      )}
+
+      {/* Right Panel - Cart */}
+      <div className={`
+        ${showMobileCart ? 'translate-x-0' : 'translate-x-full'}
+        lg:translate-x-0
+        fixed right-0 top-0 h-full w-full sm:w-96 z-50
+        lg:relative lg:z-auto lg:h-auto
+        lg:w-96 flex-shrink-0 bg-white lg:rounded-2xl shadow-soft flex flex-col min-w-0
+        transition-transform duration-300
+      `}>
         {/* Header */}
         <div className="p-4 border-b border-primary-100">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold text-gray-800">Carrito</h2>
-            {items.length > 0 && (
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <button
+                  onClick={() => dispatch(clearCart())}
+                  className="text-red-500 hover:text-red-600 text-sm"
+                >
+                  Limpiar
+                </button>
+              )}
               <button
-                onClick={() => dispatch(clearCart())}
-                className="text-red-500 hover:text-red-600 text-sm"
+                onClick={() => setShowMobileCart(false)}
+                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 touch-target"
               >
-                Limpiar
+                <X size={18} />
               </button>
-            )}
+            </div>
           </div>
           <button 
             onClick={() => setShowCustomerModal(true)}

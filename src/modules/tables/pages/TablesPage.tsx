@@ -412,13 +412,13 @@ const TablesPage = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 p-4 overflow-hidden">
+    <div className="flex flex-col lg:flex-row min-h-[calc(100vh-5rem)] sm:min-h-[calc(100vh-4rem)] gap-3 lg:gap-4 p-2 sm:p-4 overflow-auto">
       {/* Left: Table Grid */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Mesas</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Mesas</h1>
             <p className="text-sm text-gray-500">
               {tables.filter(t => t.status === 'OCUPADA').length} ocupadas de {tables.length} mesas
             </p>
@@ -435,7 +435,7 @@ const TablesPage = () => {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 mb-4 flex-wrap flex-shrink-0">
+        <div className="flex gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 flex-shrink-0">
           <button
             onClick={() => setZoneFilter(null)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -537,7 +537,14 @@ const TablesPage = () => {
       </div>
 
       {/* Right: Table Detail Panel */}
-      <div className="w-96 bg-white rounded-2xl shadow-soft flex flex-col flex-shrink-0 overflow-hidden">
+      <div className={`
+        ${selectedTable ? 'translate-x-0' : 'translate-x-full'}
+        lg:translate-x-0
+        fixed right-0 top-0 h-full w-full sm:w-96 z-50
+        lg:relative lg:z-auto lg:h-auto
+        lg:w-96 bg-white lg:rounded-2xl shadow-soft flex flex-col flex-shrink-0 overflow-hidden
+        transition-transform duration-300
+      `}>
         {selectedTable ? (
           <>
             {/* Panel Header */}
@@ -719,65 +726,84 @@ const TablesPage = () => {
 
       {/* Open Table Modal */}
       {showOpenModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-scale-in">
+        <div className="modal-overlay">
+          <div className="modal-content p-5 sm:p-6 sm:max-w-md animate-scale-in">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Abrir Mesa #{selectedTable?.tableNumber}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Comensales</label>
-                <input
-                  type="number"
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="input-field"
-                  min={1}
-                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors text-lg font-bold"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={guestCount}
+                    onChange={(e) => setGuestCount(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="input-field text-center text-lg font-bold w-20"
+                    min={1}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setGuestCount(guestCount + 1)}
+                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors text-lg font-bold"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cliente (opcional)</label>
                 <div className="relative">
                   <button
                     onClick={() => setShowCustomerPicker(!showCustomerPicker)}
-                    className="w-full flex items-center gap-2 p-2.5 border border-gray-300 rounded-xl text-sm text-left hover:border-primary-400 transition-colors"
+                    className="w-full flex items-center gap-2 p-3 border border-gray-300 rounded-xl text-sm text-left hover:border-primary-400 transition-colors"
                   >
                     <User size={16} className="text-gray-400" />
-                    <span className={selectedCustomer ? 'text-gray-800' : 'text-gray-400'}>
+                    <span className={selectedCustomer ? 'text-gray-800 font-medium' : 'text-gray-400'}>
                       {selectedCustomer ? selectedCustomer.fullName : 'Cliente General'}
                     </span>
                   </button>
                   {showCustomerPicker && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 max-h-52 overflow-y-auto">
-                      <div className="p-2 border-b">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 max-h-72 flex flex-col overflow-hidden">
+                      <div className="p-2.5 border-b flex-shrink-0">
                         <input
                           type="text"
-                          placeholder="Buscar cliente..."
+                          placeholder="Buscar cliente por nombre o documento..."
                           value={customerSearch}
                           onChange={(e) => setCustomerSearch(e.target.value)}
                           className="input-field text-sm"
                           autoFocus
                         />
                       </div>
-                      <button
-                        onClick={() => { setSelectedCustomerId(null); setShowCustomerPicker(false); setCustomerSearch('') }}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 ${!selectedCustomerId ? 'bg-primary-50 font-medium' : ''}`}
-                      >
-                        Cliente General
-                      </button>
-                      {filteredCustomers.map(c => (
+                      <div className="flex-1 overflow-y-auto">
                         <button
-                          key={c.id}
-                          onClick={() => { setSelectedCustomerId(c.id); setShowCustomerPicker(false); setCustomerSearch('') }}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 ${selectedCustomerId === c.id ? 'bg-primary-50 font-medium' : ''}`}
+                          onClick={() => { setSelectedCustomerId(null); setShowCustomerPicker(false); setCustomerSearch('') }}
+                          className={`w-full text-left px-3 py-2.5 text-sm hover:bg-primary-50 ${!selectedCustomerId ? 'bg-primary-50 font-medium' : ''}`}
                         >
-                          <span>{c.fullName}</span>
-                          <span className="text-xs text-gray-400 ml-2">{c.documentNumber}</span>
+                          Cliente General
                         </button>
-                      ))}
+                        {filteredCustomers.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => { setSelectedCustomerId(c.id); setShowCustomerPicker(false); setCustomerSearch('') }}
+                            className={`w-full text-left px-3 py-2.5 text-sm hover:bg-primary-50 flex items-center justify-between ${selectedCustomerId === c.id ? 'bg-primary-50 font-medium' : ''}`}
+                          >
+                            <span>{c.fullName}</span>
+                            <span className="text-xs text-gray-400">{c.documentNumber}</span>
+                          </button>
+                        ))}
+                      </div>
                       <button
                         onClick={() => { setShowCustomerPicker(false); setShowNewCustomerModal(true) }}
-                        className="w-full text-left px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 border-t font-medium flex items-center gap-1"
+                        className="w-full text-left px-3 py-2.5 text-sm text-primary-600 hover:bg-primary-50 border-t font-medium flex items-center gap-1 flex-shrink-0"
                       >
                         <UserPlus size={14} />
                         Crear Nuevo Cliente
@@ -819,21 +845,21 @@ const TablesPage = () => {
 
       {/* Add Items Modal */}
       {showAddItemsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-scale-in">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-xl font-bold text-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-content p-0 sm:max-w-4xl max-h-[95vh] sm:max-h-[85vh] flex flex-col animate-scale-in">
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
                 Agregar Productos - Mesa #{selectedTable?.tableNumber}
               </h3>
-              <button onClick={() => setShowAddItemsModal(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowAddItemsModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={24} />
               </button>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col sm:flex-row flex-1 min-h-0 overflow-hidden">
               {/* Products list */}
-              <div className="flex-1 flex flex-col border-r overflow-hidden">
-                <div className="p-3 border-b">
+              <div className="flex-1 flex flex-col sm:border-r min-h-0 overflow-hidden">
+                <div className="p-3 sm:p-4 border-b flex-shrink-0">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
@@ -841,15 +867,15 @@ const TablesPage = () => {
                       placeholder="Buscar producto..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="input-field pl-10 text-sm"
+                      className="input-field pl-10"
                       autoFocus
                     />
                   </div>
-                  <div className="flex gap-1 mt-2 overflow-x-auto">
+                  <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1">
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${
-                        !selectedCategory ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                        !selectedCategory ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
                       Todos
@@ -858,8 +884,8 @@ const TablesPage = () => {
                       <button
                         key={cat.id}
                         onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
-                        className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${
-                          selectedCategory === cat.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                          selectedCategory === cat.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
                         {cat.name}
@@ -867,18 +893,18 @@ const TablesPage = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1">
                   {filteredProducts.map(product => (
                     <button
                       key={product.id}
                       onClick={() => addProductToList(product)}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-primary-50 transition-colors text-left"
+                      className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-primary-50 transition-colors text-left"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{product.name}</p>
                         <p className="text-xs text-gray-500">{product.code}</p>
                       </div>
-                      <span className="text-sm font-semibold text-primary-600 ml-2">
+                      <span className="text-sm font-semibold text-primary-600 ml-3 flex-shrink-0">
                         {formatCurrency(product.salePrice)}
                       </span>
                     </button>
@@ -887,55 +913,55 @@ const TablesPage = () => {
               </div>
 
               {/* Cart */}
-              <div className="w-64 flex flex-col">
-                <div className="p-3 border-b">
-                  <h4 className="font-semibold text-gray-700 text-sm">
+              <div className="w-full sm:w-72 flex flex-col border-t sm:border-t-0 min-h-0">
+                <div className="p-3 sm:p-4 border-b flex-shrink-0">
+                  <h4 className="font-semibold text-gray-700">
                     Por agregar ({itemsToAdd.length})
                   </h4>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1.5">
                   {itemsToAdd.map(item => (
-                    <div key={item.product.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <div key={item.product.id} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{item.product.name}</p>
+                        <p className="text-sm font-medium truncate">{item.product.name}</p>
                         <p className="text-xs text-gray-500">{formatCurrency(item.product.salePrice * item.quantity)}</p>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => updateItemQuantity(item.product.id, -1)}
-                          className="p-0.5 rounded hover:bg-gray-200"
+                          className="p-1 rounded-lg hover:bg-gray-200 transition-colors"
                         >
-                          <Minus size={12} />
+                          <Minus size={14} />
                         </button>
-                        <span className="text-xs font-bold w-5 text-center">{item.quantity}</span>
+                        <span className="text-sm font-bold w-6 text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateItemQuantity(item.product.id, 1)}
-                          className="p-0.5 rounded hover:bg-gray-200"
+                          className="p-1 rounded-lg hover:bg-gray-200 transition-colors"
                         >
-                          <Plus size={12} />
+                          <Plus size={14} />
                         </button>
                         <button
                           onClick={() => removeItemFromList(item.product.id)}
-                          className="p-0.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 ml-1"
+                          className="p-1 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-500 ml-1 transition-colors"
                         >
-                          <X size={12} />
+                          <X size={14} />
                         </button>
                       </div>
                     </div>
                   ))}
                   {itemsToAdd.length === 0 && (
-                    <p className="text-center text-xs text-gray-400 py-8">
+                    <p className="text-center text-sm text-gray-400 py-8">
                       Selecciona productos de la lista
                     </p>
                   )}
                 </div>
-                <div className="p-3 border-t">
+                <div className="p-3 sm:p-4 border-t flex-shrink-0">
                   <button
                     onClick={handleAddItems}
                     disabled={processing || itemsToAdd.length === 0}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
                   >
-                    {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight size={16} />}
+                    {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <ChevronRight size={18} />}
                     {processing ? 'Agregando...' : 'Confirmar'}
                   </button>
                 </div>
@@ -947,8 +973,8 @@ const TablesPage = () => {
 
       {/* Pay Modal */}
       {showPayModal && activeSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="modal-overlay">
+          <div className="modal-content p-6 animate-scale-in">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Cobrar Mesa #{selectedTable?.tableNumber}
             </h3>
@@ -1030,8 +1056,8 @@ const TablesPage = () => {
 
       {/* Create Table Modal */}
       {showCreateTableModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-scale-in">
+        <div className="modal-overlay">
+          <div className="modal-content p-6 animate-scale-in">
             <h3 className="text-xl font-bold text-gray-800 mb-4">Nueva Mesa</h3>
             <div className="space-y-4">
               <div>
@@ -1100,8 +1126,8 @@ const TablesPage = () => {
 
       {/* New Customer Modal */}
       {showNewCustomerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="modal-overlay" style={{ zIndex: 60 }}>
+          <div className="modal-content p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-gray-800">Nuevo Cliente</h3>
               <button onClick={() => setShowNewCustomerModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -1178,8 +1204,8 @@ const TablesPage = () => {
 
       {/* Invoice Confirmation Modal (after pay) */}
       {showInvoiceModal && completedInvoice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+        <div className="modal-overlay">
+          <div className="modal-content p-6 animate-scale-in">
             <div className="text-center mb-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <CreditCard size={32} className="text-green-600" />

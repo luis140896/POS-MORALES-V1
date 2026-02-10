@@ -124,15 +124,15 @@ const Header = ({ onMenuClick }: HeaderProps) => {
   }
 
   return (
-    <header className="h-16 bg-white/80 backdrop-blur-lg border-b border-primary-100 flex items-center justify-between px-6 sticky top-0 z-20">
-      <div className="flex items-center gap-4">
+    <header className="h-14 sm:h-16 bg-white/80 backdrop-blur-lg border-b border-primary-100 flex items-center justify-between px-3 sm:px-6 sticky top-0 z-20">
+      <div className="flex items-center gap-2 sm:gap-4">
         <button
           onClick={onMenuClick}
-          className="p-2 rounded-xl hover:bg-primary-50 text-gray-600 transition-colors lg:hidden"
+          className="p-2 rounded-xl hover:bg-primary-50 text-gray-600 transition-colors lg:hidden touch-target"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-800">
+        <h1 className="text-sm sm:text-lg font-semibold text-gray-800 truncate">
           Sistema de Punto de Venta
         </h1>
       </div>
