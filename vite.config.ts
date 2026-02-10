@@ -10,9 +10,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5178,
+    port: 5179,
     host: true,
-    allowedHosts: ['freight-nec-killing-protest.trycloudflare.com'],
+    allowedHosts: ['grew-sim-silicon-december.trycloudflare.com'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

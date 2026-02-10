@@ -290,6 +290,11 @@ interface CategoriesPanelProps {
   categories: Category[]
   selectedCategory: number | null
   setSelectedCategory: (categoryId: number | null) => void
+  organizing: boolean
+  onStartOrganize: () => void
+  onAcceptOrganize: () => void
+  onCancelOrganize: () => void
+  onReorderCategory: (activeId: number, overId: number) => void
 }
 
 const CategoriesPanel = ({
@@ -298,7 +303,14 @@ const CategoriesPanel = ({
   categories,
   selectedCategory,
   setSelectedCategory,
+  organizing,
+  onStartOrganize,
+  onAcceptOrganize,
+  onCancelOrganize,
+  onReorderCategory,
 }: CategoriesPanelProps) => {
+  const [draggingCategoryId, setDraggingCategoryId] = useState<number | null>(null)
+
   return (
     <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
       <div className="flex items-center justify-between gap-2">
@@ -325,6 +337,32 @@ const CategoriesPanel = ({
             <LayoutGrid size={18} />
           </button>
         </div>
+        {!organizing ? (
+          <button
+            onClick={onStartOrganize}
+            className="px-3 py-2 rounded-xl bg-white text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-colors text-sm font-medium"
+            title="Organizar categorías"
+          >
+            Organizar
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={onCancelOrganize}
+              className="px-3 py-2 rounded-xl bg-white text-gray-600 hover:text-gray-800 hover:bg-gray-50 transition-colors text-sm font-medium"
+              title="Cancelar"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onAcceptOrganize}
+              className="px-3 py-2 rounded-xl bg-primary-600 text-white hover:bg-primary-700 transition-colors text-sm font-medium"
+              title="Aceptar"
+            >
+              Aceptar
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-soft p-3 h-auto max-h-[220px] overflow-y-auto inline-block w-fit max-w-full">
@@ -345,6 +383,27 @@ const CategoriesPanel = ({
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
+              draggable={organizing}
+              onDragStart={() => {
+                if (!organizing) return
+                setDraggingCategoryId(cat.id)
+              }}
+              onDragEnd={() => {
+                if (!organizing) return
+                setDraggingCategoryId(null)
+              }}
+              onDragOver={(e) => {
+                if (!organizing) return
+                if (draggingCategoryId === null || draggingCategoryId === cat.id) return
+                e.preventDefault()
+              }}
+              onDrop={(e) => {
+                if (!organizing) return
+                if (draggingCategoryId === null || draggingCategoryId === cat.id) return
+                e.preventDefault()
+                onReorderCategory(draggingCategoryId, cat.id)
+                setDraggingCategoryId(null)
+              }}
               className={`inline-flex items-start gap-2 px-3 py-2 rounded-xl transition-all w-auto max-w-full ${
                 selectedCategory === cat.id
                   ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft'
@@ -500,6 +559,9 @@ const POSPage = () => {
   const [completedInvoice, setCompletedInvoice] = useState<any>(null)
   const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
 
+  const [isOrganizingCategories, setIsOrganizingCategories] = useState(false)
+  const [draftCategoryOrder, setDraftCategoryOrder] = useState<number[] | null>(null)
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -569,6 +631,59 @@ const POSPage = () => {
     (selectedCategory === null || p.categoryId === selectedCategory) &&
     (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.code.includes(searchTerm))
   )
+
+  const categoriesToShow: Category[] = (() => {
+    if (!isOrganizingCategories || !draftCategoryOrder) return categories
+    const byId = new Map(categories.map(c => [c.id, c]))
+    const ordered: Category[] = []
+    for (const id of draftCategoryOrder) {
+      const cat = byId.get(id)
+      if (cat) ordered.push(cat)
+    }
+    return ordered
+  })()
+
+  const handleStartOrganizeCategories = () => {
+    setIsOrganizingCategories(true)
+    setDraftCategoryOrder(categories.map(c => c.id))
+  }
+
+  const handleCancelOrganizeCategories = () => {
+    setIsOrganizingCategories(false)
+    setDraftCategoryOrder(null)
+  }
+
+  const handleAcceptOrganizeCategories = async () => {
+    if (!draftCategoryOrder?.length) {
+      handleCancelOrganizeCategories()
+      return
+    }
+
+    try {
+      await categoryService.reorder({ categoryIds: draftCategoryOrder })
+      toast.success('Orden de categorías guardado')
+      setIsOrganizingCategories(false)
+      setDraftCategoryOrder(null)
+      fetchData()
+    } catch (error: any) {
+      console.error('Error reordering categories:', error)
+      toast.error(error.response?.data?.message || 'No se pudo guardar el orden de categorías')
+    }
+  }
+
+  const handleReorderCategoryDraft = (activeId: number, overId: number) => {
+    if (!isOrganizingCategories || !draftCategoryOrder) return
+    if (activeId === overId) return
+
+    const fromIndex = draftCategoryOrder.indexOf(activeId)
+    const toIndex = draftCategoryOrder.indexOf(overId)
+    if (fromIndex === -1 || toIndex === -1) return
+
+    const next = [...draftCategoryOrder]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setDraftCategoryOrder(next)
+  }
 
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
@@ -706,9 +821,14 @@ const POSPage = () => {
         <CategoriesPanel
           cardSize={cardSize}
           setCardSize={setCardSize}
-          categories={categories}
+          categories={categoriesToShow}
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
+          organizing={isOrganizingCategories}
+          onStartOrganize={handleStartOrganizeCategories}
+          onAcceptOrganize={handleAcceptOrganizeCategories}
+          onCancelOrganize={handleCancelOrganizeCategories}
+          onReorderCategory={handleReorderCategoryDraft}
         />
 
         {/* Products Grid */}

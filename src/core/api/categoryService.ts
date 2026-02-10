@@ -10,6 +10,10 @@ export interface CategoryRequest {
   isActive?: boolean
 }
 
+export interface ReorderCategoriesRequest {
+  categoryIds: number[]
+}
+
 export const categoryService = {
   getAll: () => api.get<Category[]>('/categories'),
   
@@ -23,5 +27,7 @@ export const categoryService = {
   
   update: (id: number, category: CategoryRequest) => api.put<Category>(`/categories/${id}`, category),
   
+  reorder: (payload: ReorderCategoriesRequest) => api.put<void>('/categories/reorder', payload),
+
   delete: (id: number) => api.delete(`/categories/${id}`),
 }
