@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, Grid3X3, LayoutGrid, Grid2X2 } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, Grid3X3, LayoutGrid, Grid2X2, UtensilsCrossed } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
 import { addItem, removeItem, incrementQuantity, decrementQuantity, clearCart, setCustomer, selectCartTotal } from '../store/cartSlice'
@@ -9,7 +9,8 @@ import { productService } from '@/core/api/productService'
 import { categoryService } from '@/core/api/categoryService'
 import { customerService } from '@/core/api/customerService'
 import { invoiceService } from '@/core/api/invoiceService'
-import { Product, Category, Customer } from '@/types'
+import { tableService } from '@/core/api/tableService'
+import { Product, Category, Customer, RestaurantTable } from '@/types'
 
 interface ProductWithCategory extends Product {
   categoryId: number
@@ -559,11 +560,25 @@ const POSPage = () => {
   const [completedInvoice, setCompletedInvoice] = useState<any>(null)
   const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
 
+  // Table selection for POS
+  const [tables, setTables] = useState<RestaurantTable[]>([])
+  const [selectedTableId, setSelectedTableId] = useState<number | null>(null)
+  const [showTableSelector, setShowTableSelector] = useState(false)
+
   const [isOrganizingCategories, setIsOrganizingCategories] = useState(false)
   const [draftCategoryOrder, setDraftCategoryOrder] = useState<number[] | null>(null)
 
+  const fetchTables = useCallback(async () => {
+    try {
+      const res = await tableService.getAll()
+      const allTables = Array.isArray(res) ? res : []
+      setTables(allTables.filter((t: RestaurantTable) => t.isActive).sort((a: RestaurantTable, b: RestaurantTable) => a.tableNumber - b.tableNumber))
+    } catch { /* tables module may not be available */ }
+  }, [])
+
   useEffect(() => {
     fetchData()
+    fetchTables()
   }, [])
 
   const normalizeProduct = (p: any): ProductWithCategory => {
@@ -721,30 +736,93 @@ const POSPage = () => {
     return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  const selectedTable = tables.find(t => t.id === selectedTableId) || null
+
   const handleConfirmSale = async () => {
     setProcessing(true)
     try {
-      const saleRequest = {
-        customerId: customerId,
-        paymentMethod: paymentMethod,
-        discountPercent: discountType === 'percent' ? discount : 0,
-        amountReceived: parseFloat(amountReceived),
-        notes: notes,
-        details: items.map(item => ({
-          productId: item.id,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          discountAmount: 0
-        }))
-      }
+      // If a table is selected and it's available, open table + add items + pay via table flow
+      if (selectedTableId && selectedTable && selectedTable.status === 'DISPONIBLE') {
+        // Open table
+        await tableService.openTable(selectedTableId, {
+          guestCount: 1,
+          customerId: customerId,
+        })
 
-      const result = await invoiceService.createSale(saleRequest)
-      const invoiceDetail = await invoiceService.getById((result as any).id)
-      setCompletedInvoice(invoiceDetail)
-      dispatch(clearCart())
-      setShowPaymentModal(false)
-      setShowInvoiceConfirmModal(true)
-      fetchData()
+        // Add items
+        await tableService.addItems(selectedTableId, {
+          items: items.map(item => ({
+            productId: item.id,
+            quantity: item.quantity,
+            unitPrice: item.price,
+          }))
+        })
+
+        // Pay table
+        const result = await tableService.payTable(selectedTableId, {
+          paymentMethod: paymentMethod,
+          amountReceived: parseFloat(amountReceived),
+          discountPercent: discountType === 'percent' ? discount : 0,
+          notes: notes || undefined,
+        })
+
+        const invoiceDetail = await invoiceService.getById((result as any).id)
+        setCompletedInvoice(invoiceDetail)
+        dispatch(clearCart())
+        setSelectedTableId(null)
+        setShowPaymentModal(false)
+        setShowInvoiceConfirmModal(true)
+        fetchData()
+        fetchTables()
+      } else if (selectedTableId && selectedTable && selectedTable.status === 'OCUPADA') {
+        // Table already occupied: add items to existing session and pay
+        await tableService.addItems(selectedTableId, {
+          items: items.map(item => ({
+            productId: item.id,
+            quantity: item.quantity,
+            unitPrice: item.price,
+          }))
+        })
+
+        const result = await tableService.payTable(selectedTableId, {
+          paymentMethod: paymentMethod,
+          amountReceived: parseFloat(amountReceived),
+          discountPercent: discountType === 'percent' ? discount : 0,
+          notes: notes || undefined,
+        })
+
+        const invoiceDetail = await invoiceService.getById((result as any).id)
+        setCompletedInvoice(invoiceDetail)
+        dispatch(clearCart())
+        setSelectedTableId(null)
+        setShowPaymentModal(false)
+        setShowInvoiceConfirmModal(true)
+        fetchData()
+        fetchTables()
+      } else {
+        // Normal POS sale (no table)
+        const saleRequest = {
+          customerId: customerId,
+          paymentMethod: paymentMethod,
+          discountPercent: discountType === 'percent' ? discount : 0,
+          amountReceived: parseFloat(amountReceived),
+          notes: notes,
+          details: items.map(item => ({
+            productId: item.id,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            discountAmount: 0
+          }))
+        }
+
+        const result = await invoiceService.createSale(saleRequest)
+        const invoiceDetail = await invoiceService.getById((result as any).id)
+        setCompletedInvoice(invoiceDetail)
+        dispatch(clearCart())
+        setShowPaymentModal(false)
+        setShowInvoiceConfirmModal(true)
+        fetchData()
+      }
     } catch (error: any) {
       console.error('Error processing sale:', error)
       toast.error(error.response?.data?.message || 'Error al procesar la venta')
@@ -930,6 +1008,51 @@ const POSPage = () => {
             )}
             <span className="text-xs text-primary-500">(cambiar)</span>
           </button>
+          {/* Table selector */}
+          {tables.length > 0 && (
+            <div className="relative mt-2">
+              <button
+                onClick={() => setShowTableSelector(!showTableSelector)}
+                className={`flex items-center gap-2 text-sm transition-colors w-full ${
+                  selectedTableId
+                    ? 'text-primary-600 font-medium'
+                    : 'text-gray-500 hover:text-primary-600'
+                }`}
+              >
+                <UtensilsCrossed size={16} />
+                <span>{selectedTable ? `Mesa #${selectedTable.tableNumber} - ${selectedTable.name}` : 'Sin mesa (venta directa)'}</span>
+                <span className="text-xs text-primary-500">(cambiar)</span>
+              </button>
+              {showTableSelector && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 max-h-48 overflow-y-auto">
+                  <button
+                    onClick={() => { setSelectedTableId(null); setShowTableSelector(false) }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors ${
+                      !selectedTableId ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    Sin mesa (venta directa)
+                  </button>
+                  {tables.filter(t => t.status === 'DISPONIBLE' || t.status === 'OCUPADA').map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setSelectedTableId(t.id); setShowTableSelector(false) }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors flex items-center justify-between ${
+                        selectedTableId === t.id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      <span>Mesa #{t.tableNumber} - {t.name}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        t.status === 'DISPONIBLE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {t.status === 'DISPONIBLE' ? 'Libre' : 'Ocupada'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cart Items */}

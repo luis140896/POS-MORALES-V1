@@ -14,8 +14,14 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { invoiceService } from '@/core/api/invoiceService'
 import { inventoryService } from '@/core/api/inventoryService'
-import { reportService, DailySale, SalesSummary } from '@/core/api/reportService'
+import { reportService } from '@/core/api/reportService'
 import { Inventory } from '@/types'
+
+interface DailySale {
+  date: string
+  total: number
+  count: number
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
@@ -40,47 +46,48 @@ const DashboardPage = () => {
   })
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInventoryAlerts = async () => {
       try {
-        setLoading(true)
-        const [statsRes, lowStockRes, outOfStockRes] = await Promise.all([
-          invoiceService.getTodayStats(),
+        const [lowStockRes, outOfStockRes] = await Promise.all([
           inventoryService.getLowStock(),
           inventoryService.getOutOfStock()
         ])
-        // mantener compatibilidad: mostrar ventas de hoy como fallback inicial
-        const ts = statsRes as any
-        setSummaryStats({
-          totalSales: Number(ts?.totalSales ?? 0),
-          salesCount: Number(ts?.salesCount ?? 0),
-          averageTicket: Number(ts?.salesCount ?? 0) > 0 ? Number(ts?.totalSales ?? 0) / Number(ts?.salesCount ?? 0) : 0,
-        })
         setLowStock((lowStockRes as any) || [])
         setOutOfStock((outOfStockRes as any) || [])
       } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-      } finally {
-        setLoading(false)
+        console.error('Error fetching inventory alerts:', error)
       }
     }
-    fetchData()
+    fetchInventoryAlerts()
   }, [])
 
   useEffect(() => {
     const fetchSummary = async () => {
       try {
+        setLoading(true)
         setSummaryLoading(true)
         const startDateTime = `${dateRange.start}T00:00:00`
         const endDateTime = `${dateRange.end}T23:59:59`
         const res = await reportService.getSalesSummary(startDateTime, endDateTime)
-        const summary = res as SalesSummary
-        const totalSales = Number((summary as any)?.totalSales ?? 0)
-        const salesCount = Number((summary as any)?.salesCount ?? (summary as any)?.totalTransactions ?? 0)
-        const averageTicket = Number((summary as any)?.averageTicket ?? 0)
+        const summary = res as any
+        const totalSales = Number(summary?.totalSales ?? 0)
+        const salesCount = Number(summary?.salesCount ?? 0)
+        const averageTicket = Number(summary?.averageTicket ?? 0)
         setSummaryStats({ totalSales, salesCount, averageTicket })
       } catch (error) {
         console.error('Error fetching dashboard summary:', error)
+        // Fallback: intentar con endpoint de stats de hoy
+        try {
+          const statsRes = await invoiceService.getTodayStats() as any
+          setSummaryStats({
+            totalSales: Number(statsRes?.totalSales ?? 0),
+            salesCount: Number(statsRes?.salesCount ?? 0),
+            averageTicket: Number(statsRes?.salesCount ?? 0) > 0
+              ? Number(statsRes?.totalSales ?? 0) / Number(statsRes?.salesCount ?? 0) : 0,
+          })
+        } catch { /* silently fail */ }
       } finally {
+        setLoading(false)
         setSummaryLoading(false)
       }
     }
@@ -104,7 +111,10 @@ const DashboardPage = () => {
         const points: DailySale[] = []
         const cursor = new Date(startDate)
         while (cursor <= endDate) {
-          const dateStr = cursor.toISOString().split('T')[0]
+          const y = cursor.getFullYear()
+          const m = String(cursor.getMonth() + 1).padStart(2, '0')
+          const d = String(cursor.getDate()).padStart(2, '0')
+          const dateStr = `${y}-${m}-${d}`
           const existing = salesData.find((s: any) => s.date === dateStr)
           points.push({
             date: cursor.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' }),

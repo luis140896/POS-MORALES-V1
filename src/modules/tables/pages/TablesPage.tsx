@@ -2,14 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import {
   Plus, X, Users, Clock, Search, Loader2, CreditCard, Banknote,
-  Minus, Trash2, ChevronRight, UtensilsCrossed, Coffee, AlertCircle
+  Minus, Trash2, ChevronRight, UtensilsCrossed, Coffee, AlertCircle, Printer, User, UserPlus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
 import { tableService, OpenTableRequest, AddTableItemsRequest, PayTableRequest } from '@/core/api/tableService'
 import { productService } from '@/core/api/productService'
 import { categoryService } from '@/core/api/categoryService'
-import { RestaurantTable, TableSession, Product, Category, InvoiceDetail } from '@/types'
+import { customerService } from '@/core/api/customerService'
+import { invoiceService } from '@/core/api/invoiceService'
+import { RestaurantTable, TableSession, Product, Category, Customer, InvoiceDetail } from '@/types'
 
 const ZONES = ['INTERIOR', 'TERRAZA', 'BAR', 'VIP']
 
@@ -71,6 +73,19 @@ const TablesPage = () => {
   const [amountReceived, setAmountReceived] = useState('')
   const [processing, setProcessing] = useState(false)
 
+  // Customers
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false)
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
+  const [newCustomerData, setNewCustomerData] = useState({ fullName: '', documentType: 'CC', documentNumber: '', phone: '' })
+  const [savingCustomer, setSavingCustomer] = useState(false)
+
+  // Invoice printing after pay
+  const [completedInvoice, setCompletedInvoice] = useState<any>(null)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+
   // Create table form
   const [newTableNumber, setNewTableNumber] = useState('')
   const [newTableName, setNewTableName] = useState('')
@@ -102,14 +117,24 @@ const TablesPage = () => {
     }
   }, [])
 
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const res = await customerService.getAll()
+      const allCustomers = ((res as any).content || res) as Customer[]
+      setCustomers(allCustomers.filter((c: Customer) => c.isActive !== false))
+    } catch (err) {
+      console.error('Error loading customers', err)
+    }
+  }, [])
+
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      await Promise.all([fetchTables(), fetchProducts()])
+      await Promise.all([fetchTables(), fetchProducts(), fetchCustomers()])
       setLoading(false)
     }
     init()
-  }, [fetchTables, fetchProducts])
+  }, [fetchTables, fetchProducts, fetchCustomers])
 
   // Polling for table status updates every 30s
   useEffect(() => {
@@ -133,17 +158,47 @@ const TablesPage = () => {
     }
   }
 
+  const filteredCustomers = customers.filter(c =>
+    c.fullName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.documentNumber?.includes(customerSearch) ||
+    c.phone?.includes(customerSearch)
+  )
+
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId) || null
+
+  const handleCreateCustomer = async () => {
+    if (!newCustomerData.fullName.trim()) {
+      toast.error('El nombre es requerido')
+      return
+    }
+    setSavingCustomer(true)
+    try {
+      const created = await customerService.create(newCustomerData)
+      const newCustomer = created as Customer
+      setCustomers(prev => [...prev, newCustomer])
+      setSelectedCustomerId(newCustomer.id)
+      setShowNewCustomerModal(false)
+      setNewCustomerData({ fullName: '', documentType: 'CC', documentNumber: '', phone: '' })
+      toast.success('Cliente creado y seleccionado')
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al crear cliente')
+    } finally {
+      setSavingCustomer(false)
+    }
+  }
+
   const handleOpenTable = async () => {
     if (!selectedTable) return
     setProcessing(true)
     try {
-      const request: OpenTableRequest = { guestCount, notes: tableNotes || undefined }
+      const request: OpenTableRequest = { guestCount, notes: tableNotes || undefined, customerId: selectedCustomerId || undefined }
       const res = await tableService.openTable(selectedTable.id, request)
       setActiveSession(res as TableSession)
       toast.success(`Mesa #${selectedTable.tableNumber} abierta`)
       setShowOpenModal(false)
       setGuestCount(1)
       setTableNotes('')
+      setSelectedCustomerId(null)
       await fetchTables()
       // Refresh selected table
       const updated = await tableService.getById(selectedTable.id)
@@ -200,7 +255,15 @@ const TablesPage = () => {
         paymentMethod,
         amountReceived: parseFloat(amountReceived),
       }
-      await tableService.payTable(selectedTable.id, request)
+      const result = await tableService.payTable(selectedTable.id, request) as any
+      // Fetch full invoice for printing
+      try {
+        const invoiceDetail = await invoiceService.getById(result.id)
+        setCompletedInvoice(invoiceDetail)
+        setShowInvoiceModal(true)
+      } catch {
+        setCompletedInvoice(null)
+      }
       toast.success(`Mesa #${selectedTable.tableNumber} pagada exitosamente`)
       setShowPayModal(false)
       setAmountReceived('')
@@ -211,6 +274,60 @@ const TablesPage = () => {
       toast.error(err?.response?.data?.message || 'Error al pagar mesa')
     } finally {
       setProcessing(false)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  const handlePrintInvoice = () => {
+    if (!completedInvoice) return
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Factura ${completedInvoice.invoiceNumber}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; max-width: 300px; margin: 0 auto; }
+              .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+              .header h1 { margin: 0; font-size: 18px; }
+              .info { margin-bottom: 15px; font-size: 12px; }
+              .info div { margin: 3px 0; }
+              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; margin: 10px 0; }
+              .item { display: flex; justify-content: space-between; font-size: 12px; margin: 5px 0; }
+              .totals { font-size: 12px; }
+              .totals div { display: flex; justify-content: space-between; margin: 3px 0; }
+              .total-final { font-size: 16px; font-weight: bold; border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px; }
+              .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>FACTURA DE VENTA</h1>
+              <p>N° ${completedInvoice.invoiceNumber}</p>
+            </div>
+            <div class="info">
+              <div>Fecha: ${formatDate(completedInvoice.createdAt)}</div>
+              <div>Cliente: ${completedInvoice.customer?.fullName || completedInvoice.customerName || 'Cliente General'}</div>
+              <div>Método: ${completedInvoice.paymentMethod}</div>
+            </div>
+            <div class="items">
+              ${completedInvoice.details?.map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
+            </div>
+            <div class="totals">
+              <div><span>Subtotal:</span><span>${formatCurrency(completedInvoice.subtotal)}</span></div>
+              ${completedInvoice.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(completedInvoice.discountAmount)}</span></div>` : ''}
+              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(completedInvoice.total)}</span></div>
+            </div>
+            <div class="footer">¡Gracias por su compra!</div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
     }
   }
 
@@ -244,7 +361,7 @@ const TablesPage = () => {
     if (zoneFilter && t.zone !== zoneFilter) return false
     if (statusFilter && t.status !== statusFilter) return false
     return true
-  })
+  }).sort((a, b) => a.tableNumber - b.tableNumber)
 
   const filteredProducts = products.filter(p => {
     if (!p.isActive) return false
@@ -619,6 +736,57 @@ const TablesPage = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente (opcional)</label>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowCustomerPicker(!showCustomerPicker)}
+                    className="w-full flex items-center gap-2 p-2.5 border border-gray-300 rounded-xl text-sm text-left hover:border-primary-400 transition-colors"
+                  >
+                    <User size={16} className="text-gray-400" />
+                    <span className={selectedCustomer ? 'text-gray-800' : 'text-gray-400'}>
+                      {selectedCustomer ? selectedCustomer.fullName : 'Cliente General'}
+                    </span>
+                  </button>
+                  {showCustomerPicker && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 max-h-52 overflow-y-auto">
+                      <div className="p-2 border-b">
+                        <input
+                          type="text"
+                          placeholder="Buscar cliente..."
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          className="input-field text-sm"
+                          autoFocus
+                        />
+                      </div>
+                      <button
+                        onClick={() => { setSelectedCustomerId(null); setShowCustomerPicker(false); setCustomerSearch('') }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 ${!selectedCustomerId ? 'bg-primary-50 font-medium' : ''}`}
+                      >
+                        Cliente General
+                      </button>
+                      {filteredCustomers.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => { setSelectedCustomerId(c.id); setShowCustomerPicker(false); setCustomerSearch('') }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 ${selectedCustomerId === c.id ? 'bg-primary-50 font-medium' : ''}`}
+                        >
+                          <span>{c.fullName}</span>
+                          <span className="text-xs text-gray-400 ml-2">{c.documentNumber}</span>
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => { setShowCustomerPicker(false); setShowNewCustomerModal(true) }}
+                        className="w-full text-left px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 border-t font-medium flex items-center gap-1"
+                      >
+                        <UserPlus size={14} />
+                        Crear Nuevo Cliente
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
                 <input
                   type="text"
@@ -924,6 +1092,136 @@ const TablesPage = () => {
                 className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {processing ? 'Creando...' : 'Crear Mesa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Customer Modal */}
+      {showNewCustomerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Nuevo Cliente</h3>
+              <button onClick={() => setShowNewCustomerModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                <input
+                  type="text"
+                  value={newCustomerData.fullName}
+                  onChange={(e) => setNewCustomerData({ ...newCustomerData, fullName: e.target.value })}
+                  className="input-field"
+                  placeholder="Nombre del cliente"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Doc.</label>
+                  <select
+                    value={newCustomerData.documentType}
+                    onChange={(e) => setNewCustomerData({ ...newCustomerData, documentType: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="CC">CC</option>
+                    <option value="NIT">NIT</option>
+                    <option value="CE">CE</option>
+                    <option value="TI">TI</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                  <input
+                    type="text"
+                    value={newCustomerData.documentNumber}
+                    onChange={(e) => setNewCustomerData({ ...newCustomerData, documentNumber: e.target.value })}
+                    className="input-field"
+                    placeholder="Documento"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={newCustomerData.phone}
+                  onChange={(e) => setNewCustomerData({ ...newCustomerData, phone: e.target.value })}
+                  className="input-field"
+                  placeholder="Teléfono (opcional)"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowNewCustomerModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateCustomer}
+                disabled={savingCustomer || !newCustomerData.fullName.trim()}
+                className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingCustomer ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus size={20} />}
+                {savingCustomer ? 'Guardando...' : 'Crear y Seleccionar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Confirmation Modal (after pay) */}
+      {showInvoiceModal && completedInvoice && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CreditCard size={32} className="text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Pago Completado</h3>
+              <p className="text-sm text-gray-500 mt-1">Factura N° {completedInvoice.invoiceNumber}</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Cliente</span>
+                <span className="font-medium">{completedInvoice.customer?.fullName || 'Cliente General'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Método</span>
+                <span className="font-medium">{completedInvoice.paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold text-primary-700 pt-2 border-t">
+                <span>Total</span>
+                <span>{formatCurrency(completedInvoice.total)}</span>
+              </div>
+              {completedInvoice.changeAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Cambio</span>
+                  <span className="font-medium">{formatCurrency(completedInvoice.changeAmount)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={handlePrintInvoice}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
+              >
+                <Printer size={18} />
+                Imprimir Factura
+              </button>
+              <button
+                onClick={() => { setShowInvoiceModal(false); setCompletedInvoice(null) }}
+                className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cerrar sin Imprimir
               </button>
             </div>
           </div>

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
 import { Calendar, Download, BarChart3, TrendingUp, DollarSign, Loader2, Package, CreditCard } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import { reportService, SalesSummary, TopProduct, TopCustomer, InventorySummary, PaymentMethodStat } from '@/core/api/reportService'
 import { invoiceService } from '@/core/api/invoiceService'
-import * as XLSX from 'xlsx'
+import { RootState } from '@/app/store'
+import XLSX from 'xlsx-js-style'
 
 const ReportsPage = () => {
+  const { theme, company } = useSelector((state: RootState) => state.settings)
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setDate(1)).toISOString().split('T')[0],
@@ -17,10 +20,6 @@ const ReportsPage = () => {
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([])
   const [inventorySummary, setInventorySummary] = useState<InventorySummary | null>(null)
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodStat[]>([])
-
-  useEffect(() => {
-    fetchReports()
-  }, [])
 
   const fetchReports = async () => {
     try {
@@ -153,81 +152,226 @@ const ReportsPage = () => {
         { total: 0, subtotal: 0, tax: 0, discount: 0, cash: 0, card: 0, other: 0 }
       )
 
+      // Helper: convert hex color to ARGB (without #)
+      const hexToArgb = (hex: string) => hex.replace('#', '').toUpperCase()
+
+      // Style definitions using theme colors
+      const primaryColor = hexToArgb(theme.primaryColor || '#9b87f5')
+      const secondaryColor = hexToArgb(theme.secondaryColor || '#7c3aed')
+      const companyName = company.companyName || 'Mi Negocio'
+
+      const titleStyle: any = {
+        font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: secondaryColor } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+      }
+
+      const headerStyle: any = {
+        font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: primaryColor } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } },
+        },
+      }
+
+      const currencyFmt = '"$"#,##0'
+
+      const currencyStyle: any = {
+        numFmt: currencyFmt,
+        alignment: { horizontal: 'right' },
+      }
+
+      const labelStyle: any = {
+        font: { bold: true, sz: 11 },
+        alignment: { horizontal: 'left' },
+      }
+
+      const sectionStyle: any = {
+        font: { bold: true, sz: 12, color: { rgb: secondaryColor } },
+        fill: { fgColor: { rgb: 'F3F4F6' } },
+      }
+
+      // Helper: auto-fit column widths based on content
+      const autoFitColumns = (ws: any, data: any[][], minWidth = 10) => {
+        const colWidths: number[] = []
+        data.forEach(row => {
+          row.forEach((cell, i) => {
+            const len = cell != null ? String(cell).length : 0
+            colWidths[i] = Math.max(colWidths[i] || minWidth, len + 4)
+          })
+        })
+        ws['!cols'] = colWidths.map(w => ({ wch: Math.min(w, 50) }))
+      }
+
       const wb = XLSX.utils.book_new()
 
+      // === RESUMEN SHEET ===
       const resumenAoA: any[][] = [
+        [companyName],
         ['REPORTE DE VENTAS'],
         [`Período: ${dateRange.start} a ${dateRange.end}`],
         [],
         ['Concepto', 'Valor'],
-        ['Ventas Totales (Reporte)', safeNumber((salesSummary as any).totalSales)],
-        ['Transacciones (Reporte)', safeNumber((salesSummary as any).salesCount ?? (salesSummary as any).totalTransactions)],
-        ['Ticket Promedio (Reporte)', safeNumber((salesSummary as any).averageTicket)],
-        ['Costo Total (Reporte)', safeNumber((salesSummary as any).totalCost)],
-        ['Ganancia Neta (Reporte)', safeNumber((salesSummary as any).grossProfit ?? (salesSummary as any).totalProfit)],
-        ['Margen Ganancia % (Reporte)', safeNumber((salesSummary as any).profitMargin)],
+        ['Ventas Totales', safeNumber((salesSummary as any).totalSales)],
+        ['Transacciones', safeNumber((salesSummary as any).salesCount ?? (salesSummary as any).totalTransactions)],
+        ['Ticket Promedio', safeNumber((salesSummary as any).averageTicket)],
+        ['Costo Total', safeNumber((salesSummary as any).totalCost)],
+        ['Ganancia Neta', safeNumber((salesSummary as any).grossProfit ?? (salesSummary as any).totalProfit)],
+        ['Margen Ganancia %', safeNumber((salesSummary as any).profitMargin)],
         [],
-        ['CIERRE (Facturas COMPLETADAS en el período)'],
+        ['CIERRE DE CAJA'],
         ['Total Facturado', totals.total],
         ['Subtotal', totals.subtotal],
         ['Impuestos', totals.tax],
         ['Descuentos', totals.discount],
         [],
+        ['DESGLOSE POR MÉTODO DE PAGO'],
         ['Total Efectivo', totals.cash],
-        ['Total Tarjeta (Crédito + Débito)', totals.card],
+        ['Total Tarjeta', totals.card],
         ['Otros Métodos', totals.other],
       ]
 
       const wsResumen = XLSX.utils.aoa_to_sheet(resumenAoA)
+      wsResumen['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
+        { s: { r: 12, c: 0 }, e: { r: 12, c: 1 } },
+        { s: { r: 18, c: 0 }, e: { r: 18, c: 1 } },
+      ]
+
+      // Apply styles to Resumen
+      if (wsResumen['A1']) wsResumen['A1'].s = titleStyle
+      if (wsResumen['A2']) wsResumen['A2'].s = { ...titleStyle, font: { ...titleStyle.font, sz: 13 } }
+      if (wsResumen['A3']) wsResumen['A3'].s = { font: { italic: true, sz: 10, color: { rgb: '666666' } }, alignment: { horizontal: 'center' } }
+
+      // Header row (row 5)
+      if (wsResumen['A5']) wsResumen['A5'].s = headerStyle
+      if (wsResumen['B5']) wsResumen['B5'].s = headerStyle
+
+      // Section headers
+      if (wsResumen['A13']) wsResumen['A13'].s = sectionStyle
+      if (wsResumen['A19']) wsResumen['A19'].s = sectionStyle
+
+      // Apply label and currency styles to data rows
+      const currencyRows = [5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 19, 20, 21]
+      currencyRows.forEach(r => {
+        const labelRef = `A${r + 1}`
+        const valRef = `B${r + 1}`
+        if (wsResumen[labelRef]) wsResumen[labelRef].s = labelStyle
+        if (wsResumen[valRef] && typeof wsResumen[valRef].v === 'number') {
+          wsResumen[valRef].s = currencyStyle
+        }
+      })
+
+      autoFitColumns(wsResumen, resumenAoA, 20)
       XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
 
-      const invoicesRows = invoices.map((inv) => ({
-        Fecha: (inv as any).createdAt ? String((inv as any).createdAt).replace('T', ' ').slice(0, 19) : '',
-        Numero: (inv as any).invoiceNumber || '',
-        Tipo: (inv as any).invoiceType || '',
-        Estado: (inv as any).status || '',
-        Cliente: (inv as any).customer?.fullName || '',
-        MetodoPago: getPaymentMethodLabelLocal((inv as any).paymentMethod),
-        Subtotal: safeNumber((inv as any).subtotal),
-        Impuesto: safeNumber((inv as any).taxAmount),
-        Descuento: safeNumber((inv as any).discountAmount),
-        Total: safeNumber((inv as any).total),
-        Recibido: safeNumber((inv as any).amountReceived),
-        Cambio: safeNumber((inv as any).changeAmount),
-        UsuarioId: safeNumber((inv as any).userId),
-      }))
+      // === FACTURAS SHEET ===
+      const invoicesHeaders = ['Fecha', 'Número', 'Tipo', 'Estado', 'Cliente', 'Método Pago', 'Subtotal', 'Impuesto', 'Descuento', 'Total', 'Recibido', 'Cambio']
+      const invoicesData = invoices.map((inv) => [
+        (inv as any).createdAt ? String((inv as any).createdAt).replace('T', ' ').slice(0, 19) : '',
+        (inv as any).invoiceNumber || '',
+        (inv as any).invoiceType || '',
+        (inv as any).status || '',
+        (inv as any).customer?.fullName || '',
+        getPaymentMethodLabelLocal((inv as any).paymentMethod),
+        safeNumber((inv as any).subtotal),
+        safeNumber((inv as any).taxAmount),
+        safeNumber((inv as any).discountAmount),
+        safeNumber((inv as any).total),
+        safeNumber((inv as any).amountReceived),
+        safeNumber((inv as any).changeAmount),
+      ])
+      const invoicesAoA = [invoicesHeaders, ...invoicesData]
+      const wsInvoices = XLSX.utils.aoa_to_sheet(invoicesAoA)
 
-      const wsInvoices = XLSX.utils.json_to_sheet(invoicesRows)
+      // Style invoice headers
+      invoicesHeaders.forEach((_, i) => {
+        const ref = XLSX.utils.encode_cell({ r: 0, c: i })
+        if (wsInvoices[ref]) wsInvoices[ref].s = headerStyle
+      })
+
+      // Apply currency format to monetary columns (6=Subtotal, 7=Impuesto, 8=Descuento, 9=Total, 10=Recibido, 11=Cambio)
+      const moneyCols = [6, 7, 8, 9, 10, 11]
+      invoicesData.forEach((_, rowIdx) => {
+        moneyCols.forEach(colIdx => {
+          const ref = XLSX.utils.encode_cell({ r: rowIdx + 1, c: colIdx })
+          if (wsInvoices[ref]) wsInvoices[ref].s = currencyStyle
+        })
+      })
+
+      autoFitColumns(wsInvoices, invoicesAoA, 12)
       XLSX.utils.book_append_sheet(wb, wsInvoices, 'Facturas')
 
+      // === MÉTODOS DE PAGO SHEET ===
       if (paymentMethods.length > 0) {
-        const paymentRows = paymentMethods.map((m) => ({
-          Metodo: getPaymentMethodLabel(m.paymentMethod),
-          Transacciones: safeNumber((m as any).count),
-          Total: safeNumber((m as any).totalSales ?? (m as any).total),
-          Porcentaje: safeNumber((m as any).percentage),
-        }))
-        const wsPay = XLSX.utils.json_to_sheet(paymentRows)
+        const payHeaders = ['Método', 'Transacciones', 'Total', 'Porcentaje %']
+        const payData = paymentMethods.map((m) => [
+          getPaymentMethodLabel(m.paymentMethod),
+          safeNumber((m as any).count),
+          safeNumber((m as any).totalSales ?? (m as any).total),
+          safeNumber((m as any).percentage),
+        ])
+        const payAoA = [payHeaders, ...payData]
+        const wsPay = XLSX.utils.aoa_to_sheet(payAoA)
+        payHeaders.forEach((_, i) => {
+          const ref = XLSX.utils.encode_cell({ r: 0, c: i })
+          if (wsPay[ref]) wsPay[ref].s = headerStyle
+        })
+        payData.forEach((_, rowIdx) => {
+          const totalRef = XLSX.utils.encode_cell({ r: rowIdx + 1, c: 2 })
+          if (wsPay[totalRef]) wsPay[totalRef].s = currencyStyle
+        })
+        autoFitColumns(wsPay, payAoA)
         XLSX.utils.book_append_sheet(wb, wsPay, 'MetodosPago')
       }
 
+      // === TOP PRODUCTOS SHEET ===
       if (topProducts.length > 0) {
-        const prodRows = topProducts.map((p) => ({
-          Producto: p.productName,
-          Cantidad: safeNumber(p.totalQuantity),
-          Ingresos: safeNumber(p.totalRevenue),
-        }))
-        const wsProd = XLSX.utils.json_to_sheet(prodRows)
+        const prodHeaders = ['Producto', 'Cantidad', 'Ingresos']
+        const prodData = topProducts.map((p) => [
+          p.productName,
+          safeNumber(p.totalQuantity),
+          safeNumber(p.totalRevenue),
+        ])
+        const prodAoA = [prodHeaders, ...prodData]
+        const wsProd = XLSX.utils.aoa_to_sheet(prodAoA)
+        prodHeaders.forEach((_, i) => {
+          const ref = XLSX.utils.encode_cell({ r: 0, c: i })
+          if (wsProd[ref]) wsProd[ref].s = headerStyle
+        })
+        prodData.forEach((_, rowIdx) => {
+          const ref = XLSX.utils.encode_cell({ r: rowIdx + 1, c: 2 })
+          if (wsProd[ref]) wsProd[ref].s = currencyStyle
+        })
+        autoFitColumns(wsProd, prodAoA)
         XLSX.utils.book_append_sheet(wb, wsProd, 'TopProductos')
       }
 
+      // === TOP CLIENTES SHEET ===
       if (topCustomers.length > 0) {
-        const custRows = topCustomers.map((c) => ({
-          Cliente: c.customerName,
-          Compras: safeNumber(c.totalPurchases),
-          TotalGastado: safeNumber(c.totalSpent),
-        }))
-        const wsCust = XLSX.utils.json_to_sheet(custRows)
+        const custHeaders = ['Cliente', 'Compras', 'Total Gastado']
+        const custData = topCustomers.map((c) => [
+          c.customerName,
+          safeNumber(c.totalPurchases),
+          safeNumber(c.totalSpent),
+        ])
+        const custAoA = [custHeaders, ...custData]
+        const wsCust = XLSX.utils.aoa_to_sheet(custAoA)
+        custHeaders.forEach((_, i) => {
+          const ref = XLSX.utils.encode_cell({ r: 0, c: i })
+          if (wsCust[ref]) wsCust[ref].s = headerStyle
+        })
+        custData.forEach((_, rowIdx) => {
+          const ref = XLSX.utils.encode_cell({ r: rowIdx + 1, c: 2 })
+          if (wsCust[ref]) wsCust[ref].s = currencyStyle
+        })
+        autoFitColumns(wsCust, custAoA)
         XLSX.utils.book_append_sheet(wb, wsCust, 'TopClientes')
       }
 
@@ -305,7 +449,7 @@ const ReportsPage = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Transacciones</p>
-                  <p className="text-xl font-bold text-gray-800">{salesSummary?.totalTransactions || 0}</p>
+                  <p className="text-xl font-bold text-gray-800">{(salesSummary as any)?.salesCount || (salesSummary as any)?.totalTransactions || 0}</p>
                 </div>
               </div>
             </div>
@@ -343,7 +487,7 @@ const ReportsPage = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Total Productos</p>
-                    <p className="text-xl font-bold text-gray-800">{inventorySummary.totalProducts}</p>
+                    <p className="text-xl font-bold text-gray-800">{(inventorySummary as any).totalProducts || 0}</p>
                   </div>
                 </div>
               </div>
@@ -354,7 +498,7 @@ const ReportsPage = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Stock Bajo</p>
-                    <p className="text-xl font-bold text-orange-600">{inventorySummary.lowStockCount}</p>
+                    <p className="text-xl font-bold text-orange-600">{(inventorySummary as any).lowStockProducts ?? (inventorySummary as any).lowStockCount ?? 0}</p>
                   </div>
                 </div>
               </div>
@@ -365,7 +509,7 @@ const ReportsPage = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Sin Stock</p>
-                    <p className="text-xl font-bold text-red-600">{inventorySummary.outOfStockCount}</p>
+                    <p className="text-xl font-bold text-red-600">{(inventorySummary as any).outOfStockProducts ?? (inventorySummary as any).outOfStockCount ?? 0}</p>
                   </div>
                 </div>
               </div>
