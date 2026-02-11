@@ -239,7 +239,7 @@ const ProductsPage = () => {
       if (selectedProduct) {
         // Para actualización, enviar solo los campos que el backend espera
         const updateData = {
-          code: formData.code,
+          code: formData.code || undefined,
           barcode: formData.barcode || undefined,
           name: formData.name,
           description: formData.description || undefined,
@@ -267,7 +267,7 @@ const ProductsPage = () => {
       } else {
         // Para creación, incluir datos de stock inicial
         const createData = {
-          code: formData.code,
+          code: formData.code || undefined,
           barcode: formData.barcode || undefined,
           name: formData.name,
           description: formData.description || undefined,
@@ -443,10 +443,10 @@ const ProductsPage = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input
-                  label="Código *"
+                  label="Código"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  required
+                  placeholder="Auto (ej: PRD-0001)"
                 />
                 <Input
                   label="Código de Barras"

@@ -424,10 +424,12 @@ const CategoriesPanel = ({
 
 interface PaymentModalProps {
   show: boolean
-  paymentMethod: 'EFECTIVO' | 'TARJETA_CREDITO'
+  paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA'
   subtotal: number
   discountAmount: number
   total: number
+  includeServiceCharge: boolean
+  setIncludeServiceCharge: (value: boolean) => void
   amountReceived: string
   setAmountReceived: (value: string) => void
   processing: boolean
@@ -442,6 +444,8 @@ const PaymentModal = ({
   subtotal,
   discountAmount,
   total,
+  includeServiceCharge,
+  setIncludeServiceCharge,
   amountReceived,
   setAmountReceived,
   processing,
@@ -451,12 +455,15 @@ const PaymentModal = ({
 }: PaymentModalProps) => {
   if (!show) return null
 
+  const serviceChargeAmount = includeServiceCharge ? total * 0.10 : 0
+  const finalTotal = total + serviceChargeAmount
+
   return (
     <div className="modal-overlay">
       <div className="modal-content p-6 animate-scale-in">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-gray-800">
-            Pago con {paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}
+            Pago con {paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Transferencia'}
           </h3>
           <button
             onClick={onClose}
@@ -478,9 +485,31 @@ const PaymentModal = ({
               <span>-{formatCurrency(discountAmount)}</span>
             </div>
           )}
-          <div className="flex justify-between text-lg font-bold border-t pt-2">
+
+          {/* Service charge toggle */}
+          <div className="flex items-center justify-between py-2 border-t border-b border-gray-100">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeServiceCharge}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setIncludeServiceCharge(checked)
+                  const newFinal = checked ? total * 1.10 : total
+                  setAmountReceived(newFinal.toFixed(0))
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Servicio (10%)</span>
+            </label>
+            <span className={`text-sm font-medium ${includeServiceCharge ? 'text-primary-600' : 'text-gray-400'}`}>
+              {includeServiceCharge ? formatCurrency(serviceChargeAmount) : '$0'}
+            </span>
+          </div>
+
+          <div className="flex justify-between text-lg font-bold pt-1">
             <span>Total a pagar</span>
-            <span className="text-primary-600">{formatCurrency(total)}</span>
+            <span className="text-primary-600">{formatCurrency(finalTotal)}</span>
           </div>
 
           {paymentMethod === 'EFECTIVO' ? (
@@ -492,20 +521,20 @@ const PaymentModal = ({
                   value={amountReceived}
                   onChange={(e) => setAmountReceived(e.target.value)}
                   className="input-field"
-                  min={total}
+                  min={finalTotal}
                 />
               </div>
-              {parseFloat(amountReceived) >= total && (
+              {parseFloat(amountReceived) >= finalTotal && (
                 <div className="flex justify-between text-lg font-bold text-green-600">
                   <span>Cambio</span>
-                  <span>{formatCurrency(parseFloat(amountReceived) - total)}</span>
+                  <span>{formatCurrency(parseFloat(amountReceived) - finalTotal)}</span>
                 </div>
               )}
             </>
           ) : (
             <div className="p-4 bg-primary-50 rounded-xl text-center">
               <CreditCard className="w-12 h-12 mx-auto text-primary-600 mb-2" />
-              <p className="text-sm text-gray-600">El pago se procesará con tarjeta</p>
+              <p className="text-sm text-gray-600">El pago se procesará por transferencia</p>
               <p className="text-xs text-gray-400 mt-1">El monto exacto será cobrado al cliente</p>
             </div>
           )}
@@ -515,7 +544,7 @@ const PaymentModal = ({
           <Button
             variant="primary"
             className="w-full"
-            disabled={processing || (paymentMethod === 'EFECTIVO' && parseFloat(amountReceived) < total)}
+            disabled={processing || (paymentMethod === 'EFECTIVO' && parseFloat(amountReceived) < finalTotal)}
             onClick={onConfirm}
           >
             {processing ? (
@@ -549,7 +578,7 @@ const POSPage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [customerSearch, setCustomerSearch] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA_CREDITO'>('EFECTIVO')
+  const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO')
   const [amountReceived, setAmountReceived] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
@@ -559,6 +588,7 @@ const POSPage = () => {
   const [savingCustomer, setSavingCustomer] = useState(false)
   const [completedInvoice, setCompletedInvoice] = useState<any>(null)
   const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
+  const [includeServiceCharge, setIncludeServiceCharge] = useState(false)
 
   // Table selection for POS
   const [tables, setTables] = useState<RestaurantTable[]>([])
@@ -798,6 +828,7 @@ const POSPage = () => {
           paymentMethod: paymentMethod,
           amountReceived: parseFloat(amountReceived),
           discountPercent: discountType === 'percent' ? discount : 0,
+          serviceChargePercent: includeServiceCharge ? 10 : 0,
           notes: notes || undefined,
         })
 
@@ -815,6 +846,7 @@ const POSPage = () => {
           customerId: customerId,
           paymentMethod: paymentMethod,
           discountPercent: discountType === 'percent' ? discount : 0,
+          serviceChargePercent: includeServiceCharge ? 10 : 0,
           amountReceived: parseFloat(amountReceived),
           notes: notes,
           details: items.map(item => ({
@@ -841,47 +873,70 @@ const POSPage = () => {
     }
   }
 
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case 'EFECTIVO': return 'Efectivo'
+      case 'TRANSFERENCIA': return 'Transferencia'
+      case 'TARJETA_CREDITO': return 'Tarjeta Crédito'
+      case 'TARJETA_DEBITO': return 'Tarjeta Débito'
+      default: return method
+    }
+  }
+
   const handlePrintInvoice = () => {
     if (!completedInvoice) return
+    const settings = JSON.parse(localStorage.getItem('pos_settings') || '{}')
+    const companyName = settings?.company?.companyName || 'Mi Empresa'
+    const inv = completedInvoice
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Factura ${completedInvoice.invoiceNumber}</title>
+            <title>Factura ${inv.invoiceNumber}</title>
             <style>
-              body { font-family: Arial, sans-serif; padding: 20px; max-width: 300px; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-              .header h1 { margin: 0; font-size: 18px; }
-              .info { margin-bottom: 15px; font-size: 12px; }
-              .info div { margin: 3px 0; }
-              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; margin: 10px 0; }
-              .item { display: flex; justify-content: space-between; font-size: 12px; margin: 5px 0; }
-              .totals { font-size: 12px; }
-              .totals div { display: flex; justify-content: space-between; margin: 3px 0; }
-              .total-final { font-size: 16px; font-weight: bold; border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px; }
-              .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+              body { font-family: 'Courier New', monospace; padding: 10px; max-width: 300px; margin: 0 auto; font-size: 12px; }
+              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+              .header h1 { margin: 0 0 2px; font-size: 16px; text-transform: uppercase; }
+              .header .invoice-num { font-size: 13px; font-weight: bold; }
+              .header p { margin: 2px 0; font-size: 11px; }
+              .info { margin-bottom: 8px; }
+              .info div { margin: 2px 0; }
+              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 6px 0; }
+              .item { display: flex; justify-content: space-between; margin: 3px 0; }
+              .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
+              .total-final { font-size: 15px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
+              .payment-info { border-top: 1px dashed #000; margin-top: 8px; padding-top: 6px; }
+              .footer { text-align: center; margin-top: 15px; font-size: 10px; color: #666; border-top: 1px dashed #000; padding-top: 8px; }
             </style>
           </head>
           <body>
             <div class="header">
-              <h1>FACTURA DE VENTA</h1>
-              <p>N° ${completedInvoice.invoiceNumber}</p>
+              <h1>${companyName}</h1>
+              <div class="invoice-num">N° ${inv.invoiceNumber}</div>
+              <p>${formatDate(inv.createdAt)}</p>
             </div>
             <div class="info">
-              <div>Fecha: ${formatDate(completedInvoice.createdAt)}</div>
-              <div>Cliente: ${completedInvoice.customer?.fullName || completedInvoice.customerName || 'Cliente General'}</div>
-              <div>Método: ${completedInvoice.paymentMethod}</div>
+              <div>Cliente: ${inv.customer?.fullName || inv.customerName || 'Cliente General'}</div>
+              <div>Cajero: ${inv.userName || '-'}</div>
             </div>
             <div class="items">
-              ${completedInvoice.details?.map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
+              ${(inv.details || []).map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
             </div>
             <div class="totals">
-              <div><span>Subtotal:</span><span>${formatCurrency(completedInvoice.subtotal)}</span></div>
-              ${completedInvoice.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(completedInvoice.discountAmount)}</span></div>` : ''}
-              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(completedInvoice.total)}</span></div>
+              <div><span>Subtotal:</span><span>${formatCurrency(inv.subtotal)}</span></div>
+              ${inv.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
+              ${inv.serviceChargeAmount > 0 ? `<div><span>Servicio (${inv.serviceChargePercent}%):</span><span>${formatCurrency(inv.serviceChargeAmount)}</span></div>` : ''}
+              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(inv.total)}</span></div>
             </div>
-            <div class="footer">¡Gracias por su compra!</div>
+            <div class="payment-info">
+              <div><span>Método:</span><span>${getPaymentMethodLabel(inv.paymentMethod)}</span></div>
+              ${inv.amountReceived > 0 ? `<div><span>Recibido:</span><span>${formatCurrency(inv.amountReceived)}</span></div>` : ''}
+              ${inv.changeAmount > 0 ? `<div style="font-weight:bold;"><span>Cambio:</span><span>${formatCurrency(inv.changeAmount)}</span></div>` : ''}
+            </div>
+            <div class="footer">
+              <p>¡Gracias por su compra!</p>
+            </div>
           </body>
         </html>
       `)
@@ -1189,13 +1244,13 @@ const POSPage = () => {
               variant="primary" 
               disabled={items.length === 0}
               onClick={() => {
-                setPaymentMethod('TARJETA_CREDITO')
+                setPaymentMethod('TRANSFERENCIA')
                 setAmountReceived(total.toString())
                 setShowPaymentModal(true)
               }}
             >
               <CreditCard size={20} />
-              Tarjeta
+              Transferencia
             </Button>
           </div>
           {items.length > 0 && selectedTableId && selectedTable && (
@@ -1232,6 +1287,8 @@ const POSPage = () => {
         subtotal={subtotal}
         discountAmount={discountAmount}
         total={total}
+        includeServiceCharge={includeServiceCharge}
+        setIncludeServiceCharge={setIncludeServiceCharge}
         amountReceived={amountReceived}
         setAmountReceived={setAmountReceived}
         processing={processing}

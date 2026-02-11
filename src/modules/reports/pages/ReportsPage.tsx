@@ -124,7 +124,7 @@ const ReportsPage = () => {
     }
 
     const isCash = (method?: string | null) => (method || '') === 'EFECTIVO'
-    const isCard = (method?: string | null) => ['TARJETA_CREDITO', 'TARJETA_DEBITO'].includes(method || '')
+    const isTransfer = (method?: string | null) => ['TRANSFERENCIA', 'TARJETA_CREDITO', 'TARJETA_DEBITO'].includes(method || '')
 
     const getPaymentMethodLabelLocal = (method?: string | null) => {
       const m = method || ''
@@ -152,7 +152,7 @@ const ReportsPage = () => {
           acc.discount += discount
 
           if (isCash(method)) acc.cash += total
-          else if (isCard(method)) acc.card += total
+          else if (isTransfer(method)) acc.card += total
           else acc.other += total
 
           return acc
@@ -239,7 +239,7 @@ const ReportsPage = () => {
         [],
         ['DESGLOSE POR MÉTODO DE PAGO'],
         ['Total Efectivo', totals.cash],
-        ['Total Tarjeta', totals.card],
+        ['Total Transferencia', totals.card],
         ['Otros Métodos', totals.other],
       ]
 

@@ -41,6 +41,16 @@ const InvoicesPage = () => {
     return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case 'EFECTIVO': return 'Efectivo'
+      case 'TRANSFERENCIA': return 'Transferencia'
+      case 'TARJETA_CREDITO': return 'Tarjeta Crédito'
+      case 'TARJETA_DEBITO': return 'Tarjeta Débito'
+      default: return method
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'COMPLETADA': return <span className="badge badge-success">Completada</span>
@@ -253,7 +263,7 @@ const InvoicesPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Método de Pago:</span>
-                <span>{selectedInvoice.paymentMethod}</span>
+                <span>{getPaymentMethodLabel(selectedInvoice.paymentMethod || '')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Estado:</span>
@@ -283,10 +293,28 @@ const InvoicesPage = () => {
                     <span>-{formatCurrency(selectedInvoice.discountAmount)}</span>
                   </div>
                 )}
+                {(selectedInvoice as any).serviceChargeAmount > 0 && (
+                  <div className="flex justify-between text-blue-600">
+                    <span>Servicio ({(selectedInvoice as any).serviceChargePercent}%):</span>
+                    <span>{formatCurrency((selectedInvoice as any).serviceChargeAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total:</span>
                   <span className="text-primary-600">{formatCurrency(selectedInvoice.total)}</span>
                 </div>
+                {selectedInvoice.amountReceived > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Recibido:</span>
+                    <span>{formatCurrency(selectedInvoice.amountReceived)}</span>
+                  </div>
+                )}
+                {(selectedInvoice as any).changeAmount > 0 && (
+                  <div className="flex justify-between text-sm font-medium text-green-600">
+                    <span>Cambio:</span>
+                    <span>{formatCurrency((selectedInvoice as any).changeAmount)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -295,48 +323,57 @@ const InvoicesPage = () => {
                 variant="primary" 
                 className="flex-1"
                 onClick={() => {
+                  const _settings = JSON.parse(localStorage.getItem('pos_settings') || '{}')
+                  const companyName = _settings?.company?.companyName || 'Mi Empresa'
+                  const inv = selectedInvoice as any
                   const printWindow = window.open('', '_blank')
                   if (printWindow) {
                       printWindow.document.write(`
                         <html>
                           <head>
-                            <title>Factura ${selectedInvoice.invoiceNumber}</title>
+                            <title>Factura ${inv.invoiceNumber}</title>
                             <style>
-                              body { font-family: Arial, sans-serif; padding: 20px; }
-                              .header { text-align: center; margin-bottom: 20px; }
-                              .header h1 { margin: 0; font-size: 24px; }
-                              .info { margin-bottom: 20px; }
-                              .info div { display: flex; justify-content: space-between; margin: 5px 0; }
-                              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                              th { background-color: #f5f5f5; }
-                              .totals { margin-top: 20px; }
-                              .totals div { display: flex; justify-content: space-between; margin: 5px 0; }
-                              .total-final { font-size: 18px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; }
+                              body { font-family: 'Courier New', monospace; padding: 10px; max-width: 300px; margin: 0 auto; font-size: 12px; }
+                              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+                              .header h1 { margin: 0 0 2px; font-size: 16px; text-transform: uppercase; }
+                              .header .invoice-num { font-size: 13px; font-weight: bold; }
+                              .header p { margin: 2px 0; font-size: 11px; }
+                              .info { margin-bottom: 8px; }
+                              .info div { margin: 2px 0; }
+                              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 6px 0; }
+                              .item { display: flex; justify-content: space-between; margin: 3px 0; }
+                              .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
+                              .total-final { font-size: 15px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
+                              .payment-info { border-top: 1px dashed #000; margin-top: 8px; padding-top: 6px; }
+                              .footer { text-align: center; margin-top: 15px; font-size: 10px; color: #666; border-top: 1px dashed #000; padding-top: 8px; }
                             </style>
                           </head>
                           <body>
                             <div class="header">
-                              <h1>FACTURA DE VENTA</h1>
-                              <p>N° ${selectedInvoice.invoiceNumber}</p>
+                              <h1>${companyName}</h1>
+                              <div class="invoice-num">N° ${inv.invoiceNumber}</div>
+                              <p>${formatDate(inv.createdAt)}</p>
                             </div>
                             <div class="info">
-                              <div><span>Fecha:</span><span>${formatDate(selectedInvoice.createdAt)}</span></div>
-                              <div><span>Cliente:</span><span>${selectedInvoice.customer?.fullName || 'Cliente General'}</span></div>
-                              <div><span>Método de Pago:</span><span>${selectedInvoice.paymentMethod}</span></div>
+                              <div>Cliente: ${inv.customer?.fullName || inv.customerName || 'Cliente General'}</div>
+                              <div>Cajero: ${inv.userName || '-'}</div>
                             </div>
-                            <table>
-                              <thead>
-                                <tr><th>Cant.</th><th>Producto</th><th>Subtotal</th></tr>
-                              </thead>
-                              <tbody>
-                                ${selectedInvoice.details?.map(d => `<tr><td>${d.quantity}</td><td>${d.productName}</td><td>${formatCurrency(d.subtotal)}</td></tr>`).join('')}
-                              </tbody>
-                            </table>
+                            <div class="items">
+                              ${(inv.details || []).map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
+                            </div>
                             <div class="totals">
-                              <div><span>Subtotal:</span><span>${formatCurrency(selectedInvoice.subtotal)}</span></div>
-                              ${selectedInvoice.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(selectedInvoice.discountAmount)}</span></div>` : ''}
-                              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(selectedInvoice.total)}</span></div>
+                              <div><span>Subtotal:</span><span>${formatCurrency(inv.subtotal)}</span></div>
+                              ${inv.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
+                              ${inv.serviceChargeAmount > 0 ? `<div><span>Servicio (${inv.serviceChargePercent}%):</span><span>${formatCurrency(inv.serviceChargeAmount)}</span></div>` : ''}
+                              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(inv.total)}</span></div>
+                            </div>
+                            <div class="payment-info">
+                              <div><span>Método:</span><span>${getPaymentMethodLabel(inv.paymentMethod)}</span></div>
+                              ${inv.amountReceived > 0 ? `<div><span>Recibido:</span><span>${formatCurrency(inv.amountReceived)}</span></div>` : ''}
+                              ${inv.changeAmount > 0 ? `<div style="font-weight:bold;"><span>Cambio:</span><span>${formatCurrency(inv.changeAmount)}</span></div>` : ''}
+                            </div>
+                            <div class="footer">
+                              <p>¡Gracias por su compra!</p>
                             </div>
                           </body>
                         </html>

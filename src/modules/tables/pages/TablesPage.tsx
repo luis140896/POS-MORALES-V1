@@ -69,9 +69,10 @@ const TablesPage = () => {
   const [itemsToAdd, setItemsToAdd] = useState<{ product: Product; quantity: number }[]>([])
 
   // Pay form
-  const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA_CREDITO'>('EFECTIVO')
+  const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO')
   const [amountReceived, setAmountReceived] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [includeServiceCharge, setIncludeServiceCharge] = useState(false)
 
   // Customers
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -254,6 +255,7 @@ const TablesPage = () => {
       const request: PayTableRequest = {
         paymentMethod,
         amountReceived: parseFloat(amountReceived),
+        serviceChargePercent: includeServiceCharge ? 10 : 0,
       }
       const result = await tableService.payTable(selectedTable.id, request) as any
       // Fetch full invoice for printing
@@ -282,47 +284,70 @@ const TablesPage = () => {
     return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case 'EFECTIVO': return 'Efectivo'
+      case 'TRANSFERENCIA': return 'Transferencia'
+      case 'TARJETA_CREDITO': return 'Tarjeta Crédito'
+      case 'TARJETA_DEBITO': return 'Tarjeta Débito'
+      default: return method
+    }
+  }
+
   const handlePrintInvoice = () => {
     if (!completedInvoice) return
+    const settings = JSON.parse(localStorage.getItem('pos_settings') || '{}')
+    const companyName = settings?.company?.companyName || 'Mi Empresa'
+    const inv = completedInvoice
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Factura ${completedInvoice.invoiceNumber}</title>
+            <title>Factura ${inv.invoiceNumber}</title>
             <style>
-              body { font-family: Arial, sans-serif; padding: 20px; max-width: 300px; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-              .header h1 { margin: 0; font-size: 18px; }
-              .info { margin-bottom: 15px; font-size: 12px; }
-              .info div { margin: 3px 0; }
-              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; margin: 10px 0; }
-              .item { display: flex; justify-content: space-between; font-size: 12px; margin: 5px 0; }
-              .totals { font-size: 12px; }
-              .totals div { display: flex; justify-content: space-between; margin: 3px 0; }
-              .total-final { font-size: 16px; font-weight: bold; border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px; }
-              .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+              body { font-family: 'Courier New', monospace; padding: 10px; max-width: 300px; margin: 0 auto; font-size: 12px; }
+              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+              .header h1 { margin: 0 0 2px; font-size: 16px; text-transform: uppercase; }
+              .header .invoice-num { font-size: 13px; font-weight: bold; }
+              .header p { margin: 2px 0; font-size: 11px; }
+              .info { margin-bottom: 8px; }
+              .info div { margin: 2px 0; }
+              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 6px 0; }
+              .item { display: flex; justify-content: space-between; margin: 3px 0; }
+              .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
+              .total-final { font-size: 15px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
+              .payment-info { border-top: 1px dashed #000; margin-top: 8px; padding-top: 6px; }
+              .footer { text-align: center; margin-top: 15px; font-size: 10px; color: #666; border-top: 1px dashed #000; padding-top: 8px; }
             </style>
           </head>
           <body>
             <div class="header">
-              <h1>FACTURA DE VENTA</h1>
-              <p>N° ${completedInvoice.invoiceNumber}</p>
+              <h1>${companyName}</h1>
+              <div class="invoice-num">N° ${inv.invoiceNumber}</div>
+              <p>${formatDate(inv.createdAt)}</p>
             </div>
             <div class="info">
-              <div>Fecha: ${formatDate(completedInvoice.createdAt)}</div>
-              <div>Cliente: ${completedInvoice.customer?.fullName || completedInvoice.customerName || 'Cliente General'}</div>
-              <div>Método: ${completedInvoice.paymentMethod}</div>
+              <div>Cliente: ${inv.customer?.fullName || inv.customerName || 'Cliente General'}</div>
+              <div>Cajero: ${inv.userName || '-'}</div>
             </div>
             <div class="items">
-              ${completedInvoice.details?.map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
+              ${(inv.details || []).map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
             </div>
             <div class="totals">
-              <div><span>Subtotal:</span><span>${formatCurrency(completedInvoice.subtotal)}</span></div>
-              ${completedInvoice.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(completedInvoice.discountAmount)}</span></div>` : ''}
-              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(completedInvoice.total)}</span></div>
+              <div><span>Subtotal:</span><span>${formatCurrency(inv.subtotal)}</span></div>
+              ${inv.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
+              ${inv.serviceChargeAmount > 0 ? `<div><span>Servicio (${inv.serviceChargePercent}%):</span><span>${formatCurrency(inv.serviceChargeAmount)}</span></div>` : ''}
+              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(inv.total)}</span></div>
             </div>
-            <div class="footer">¡Gracias por su compra!</div>
+            <div class="payment-info">
+              <div><span>Método:</span><span>${getPaymentMethodLabel(inv.paymentMethod)}</span></div>
+              ${inv.amountReceived > 0 ? `<div><span>Recibido:</span><span>${formatCurrency(inv.amountReceived)}</span></div>` : ''}
+              ${inv.changeAmount > 0 ? `<div style="font-weight:bold;"><span>Cambio:</span><span>${formatCurrency(inv.changeAmount)}</span></div>` : ''}
+            </div>
+            <div class="footer">
+              <p>¡Gracias por su compra!</p>
+            </div>
           </body>
         </html>
       `)
@@ -978,60 +1003,92 @@ const TablesPage = () => {
               Cobrar Mesa #{selectedTable?.tableNumber}
             </h3>
 
-            <div className="bg-primary-50 rounded-xl p-4 mb-4">
-              <div className="flex justify-between text-lg font-bold text-primary-700">
-                <span>Total a pagar</span>
-                <span>{formatCurrency(activeSession.total || 0)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setPaymentMethod('EFECTIVO')}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
-                      paymentMethod === 'EFECTIVO' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
-                    }`}
-                  >
-                    <Banknote size={18} />
-                    Efectivo
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('TARJETA_CREDITO')
-                      setAmountReceived(String(activeSession.total || 0))
-                    }}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
-                      paymentMethod === 'TARJETA_CREDITO' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
-                    }`}
-                  >
-                    <CreditCard size={18} />
-                    Tarjeta
-                  </button>
-                </div>
-              </div>
-
-              {paymentMethod === 'EFECTIVO' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto recibido</label>
-                  <input
-                    type="number"
-                    value={amountReceived}
-                    onChange={(e) => setAmountReceived(e.target.value)}
-                    className="input-field"
-                    min={activeSession.total || 0}
-                  />
-                  {parseFloat(amountReceived) >= (activeSession.total || 0) && (
-                    <div className="flex justify-between text-lg font-bold text-green-600 mt-2">
-                      <span>Cambio</span>
-                      <span>{formatCurrency(parseFloat(amountReceived) - (activeSession.total || 0))}</span>
+            {(() => {
+              const baseTotal = activeSession.total || 0
+              const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
+              const finalTotal = baseTotal + svcAmount
+              return (
+                <>
+                  <div className="bg-primary-50 rounded-xl p-4 mb-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Subtotal</span>
+                      <span>{formatCurrency(baseTotal)}</span>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    <div className="flex items-center justify-between py-1 border-t border-primary-100">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeServiceCharge}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setIncludeServiceCharge(checked)
+                            const newFinal = checked ? baseTotal * 1.10 : baseTotal
+                            setAmountReceived(newFinal.toFixed(0))
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Servicio (10%)</span>
+                      </label>
+                      <span className={`text-sm font-medium ${includeServiceCharge ? 'text-primary-600' : 'text-gray-400'}`}>
+                        {includeServiceCharge ? formatCurrency(svcAmount) : '$0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold text-primary-700 pt-1 border-t border-primary-100">
+                      <span>Total a pagar</span>
+                      <span>{formatCurrency(finalTotal)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setPaymentMethod('EFECTIVO')}
+                          className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                            paymentMethod === 'EFECTIVO' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
+                          }`}
+                        >
+                          <Banknote size={18} />
+                          Efectivo
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPaymentMethod('TRANSFERENCIA')
+                            setAmountReceived(String(finalTotal))
+                          }}
+                          className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                            paymentMethod === 'TRANSFERENCIA' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
+                          }`}
+                        >
+                          <CreditCard size={18} />
+                          Transferencia
+                        </button>
+                      </div>
+                    </div>
+
+                    {paymentMethod === 'EFECTIVO' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Monto recibido</label>
+                        <input
+                          type="number"
+                          value={amountReceived}
+                          onChange={(e) => setAmountReceived(e.target.value)}
+                          className="input-field"
+                          min={finalTotal}
+                        />
+                        {parseFloat(amountReceived) >= finalTotal && (
+                          <div className="flex justify-between text-lg font-bold text-green-600 mt-2">
+                            <span>Cambio</span>
+                            <span>{formatCurrency(parseFloat(amountReceived) - finalTotal)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
 
             <div className="flex gap-3 mt-6">
               <button
@@ -1220,7 +1277,7 @@ const TablesPage = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Método</span>
-                <span className="font-medium">{completedInvoice.paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}</span>
+                <span className="font-medium">{completedInvoice.paymentMethod === 'EFECTIVO' ? 'Efectivo' : 'Transferencia'}</span>
               </div>
               <div className="flex justify-between text-lg font-bold text-primary-700 pt-2 border-t">
                 <span>Total</span>

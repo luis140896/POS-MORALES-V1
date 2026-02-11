@@ -12,6 +12,7 @@ export interface CreateSaleRequest {
   customerId?: number | null
   paymentMethod: string
   discountPercent?: number
+  serviceChargePercent?: number
   amountReceived: number
   notes?: string
   details: SaleDetailRequest[]
