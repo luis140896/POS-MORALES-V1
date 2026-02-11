@@ -412,7 +412,7 @@ const TablesPage = () => {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-[calc(100vh-5rem)] sm:min-h-[calc(100vh-4rem)] gap-3 lg:gap-4 p-2 sm:p-4 overflow-auto">
+    <div className="flex flex-col lg:flex-row lg:h-[calc(100dvh-7rem)] gap-3 lg:gap-4 lg:overflow-hidden">
       {/* Left: Table Grid */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
@@ -472,7 +472,7 @@ const TablesPage = () => {
         </div>
 
         {/* Tables Grid */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="lg:flex-1 lg:overflow-y-auto">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {filteredTables.map(table => {
               const colors = STATUS_COLORS[table.status] || STATUS_COLORS.DISPONIBLE
@@ -538,8 +538,7 @@ const TablesPage = () => {
 
       {/* Right: Table Detail Panel */}
       <div className={`
-        ${selectedTable ? 'translate-x-0' : 'translate-x-full'}
-        lg:translate-x-0
+        ${selectedTable ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
         fixed right-0 top-0 h-full w-full sm:w-96 z-50
         lg:relative lg:z-auto lg:h-auto
         lg:w-96 bg-white lg:rounded-2xl shadow-soft flex flex-col flex-shrink-0 overflow-hidden

@@ -27,7 +27,7 @@ const MainLayout = () => {
   }, [location.pathname, isMobile])
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex">
+    <div className="h-screen h-[100dvh] flex overflow-hidden">
       {/* Mobile backdrop */}
       {isMobile && sidebarOpen && (
         <div
@@ -43,12 +43,12 @@ const MainLayout = () => {
         onClose={() => setSidebarOpen(false)}
       />
       
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${
+      <div className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${
         !isMobile ? (sidebarOpen ? 'ml-64' : 'ml-20') : 'ml-0'
       }`}>
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
         
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-auto">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>

@@ -153,7 +153,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
           </button>
 
           {notifOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-hover border border-primary-100 animate-fade-in overflow-hidden">
+            <div className="absolute right-0 sm:right-0 top-full mt-2 w-[calc(100vw-1.5rem)] sm:w-80 max-w-sm bg-white rounded-xl shadow-hover border border-primary-100 animate-fade-in overflow-hidden -mr-2 sm:mr-0">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-800 text-sm">Notificaciones</h3>
                 {notifications.length > 0 && (

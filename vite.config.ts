@@ -10,9 +10,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5179,
-    host: true,
-    allowedHosts: ['grew-sim-silicon-december.trycloudflare.com'],
+    port: 5173,
+    host: '0.0.0.0',
+    strictPort: true,
+    allowedHosts: ['sell-wants-officials-experts.trycloudflare.com'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

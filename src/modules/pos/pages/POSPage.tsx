@@ -891,9 +891,9 @@ const POSPage = () => {
   }
 
   return (
-    <div className="min-h-[calc(100vh-5rem)] sm:min-h-[calc(100vh-6rem)] lg:h-[calc(100vh-7rem)] flex flex-col lg:flex-row gap-3 lg:gap-6 animate-fade-in overflow-auto">
+    <div className="flex flex-col lg:flex-row lg:h-[calc(100dvh-7rem)] gap-3 lg:gap-6 animate-fade-in lg:overflow-hidden">
       {/* Left Panel - Products */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col lg:overflow-hidden">
         {/* Search */}
         <div className="relative mb-3 max-w-full lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -920,7 +920,7 @@ const POSPage = () => {
         />
 
         {/* Products Grid */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="lg:flex-1 lg:overflow-y-auto pb-16 lg:pb-0">
           {loading ? (
             <div className="h-full flex items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
