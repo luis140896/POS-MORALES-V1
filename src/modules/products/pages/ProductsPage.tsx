@@ -3,6 +3,7 @@ import { Plus, Search, Edit2, Trash2, Filter, X, Loader2, Image, ArrowUp, ArrowD
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import Input from '@/shared/components/ui/Input'
+import MoneyInput from '@/shared/components/ui/MoneyInput'
 import { productService } from '@/core/api/productService'
 import { categoryService } from '@/core/api/categoryService'
 import { inventoryService } from '@/core/api/inventoryService'
@@ -61,6 +62,10 @@ const ProductsPage = () => {
   const [adjustQuantity, setAdjustQuantity] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
   const [adjusting, setAdjusting] = useState(false)
+  const [filterCategory, setFilterCategory] = useState<number | ''>('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -222,6 +227,25 @@ const ProductsPage = () => {
     }
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImage(true)
+    try {
+      const res = await productService.uploadImage(file)
+      const url = (res as any)?.url || (res as any)?.data?.url
+      if (url) {
+        setFormData(prev => ({ ...prev, imageUrl: url }))
+        toast.success('Imagen subida correctamente')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al subir imagen')
+    } finally {
+      setUploadingImage(false)
+      e.target.value = ''
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -295,6 +319,20 @@ const ProductsPage = () => {
     }
   }
 
+  const filteredProducts = products
+    .filter((p) => {
+      if (filterCategory && (p.category?.id ?? (p as any).categoryId) !== filterCategory) return false
+      if (filterStatus === 'active' && !p.isActive) return false
+      if (filterStatus === 'inactive' && p.isActive) return false
+      return true
+    })
+    .sort((a, b) => {
+      const catA = (a.category?.name || '').toLowerCase()
+      const catB = (b.category?.name || '').toLowerCase()
+      if (catA !== catB) return catA.localeCompare(catB)
+      return a.name.localeCompare(b.name)
+    })
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -310,21 +348,63 @@ const ProductsPage = () => {
 
       {/* Filters */}
       <div className="card">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o código..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-field pl-12"
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o código..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-field pl-12"
+              />
+            </div>
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
+              <Filter size={20} />
+              Filtros {(filterCategory || filterStatus !== 'all') ? `(${[filterCategory ? 1 : 0, filterStatus !== 'all' ? 1 : 0].reduce((a, b) => a + b, 0)})` : ''}
+            </Button>
           </div>
-          <Button variant="secondary">
-            <Filter size={20} />
-            Filtros
-          </Button>
+          {showFilters && (
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-500 whitespace-nowrap">Categoría:</label>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value ? Number(e.target.value) : '')}
+                  className="input-field py-1.5 px-2 text-sm w-[180px]"
+                >
+                  <option value="">Todas</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-500 whitespace-nowrap">Estado:</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+                  className="input-field py-1.5 px-2 text-sm w-[140px]"
+                >
+                  <option value="all">Todos</option>
+                  <option value="active">Activos</option>
+                  <option value="inactive">Inactivos</option>
+                </select>
+              </div>
+              {(filterCategory || filterStatus !== 'all') && (
+                <button
+                  onClick={() => { setFilterCategory(''); setFilterStatus('all') }}
+                  className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                >
+                  <X size={14} /> Limpiar filtros
+                </button>
+              )}
+              <span className="text-xs text-gray-400 ml-auto">
+                {filteredProducts.length} producto(s)
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -353,7 +433,7 @@ const ProductsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => {
+              {filteredProducts.map((product) => {
                 const margin = product.costPrice > 0 
                   ? ((product.salePrice - product.costPrice) / product.costPrice * 100).toFixed(1)
                   : '0'
@@ -430,7 +510,7 @@ const ProductsPage = () => {
       {/* Product Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
+          <div className="modal-content-lg p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-800">
                 {selectedProduct ? 'Editar Producto' : 'Nuevo Producto'}
@@ -478,22 +558,16 @@ const ProductsPage = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Precio Costo *"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                <MoneyInput
+                  label="Precio Costo"
                   value={formData.costPrice}
-                  onChange={(e) => setFormData({ ...formData, costPrice: e.target.value ? Number(e.target.value) : '' })}
+                  onChange={(val) => setFormData({ ...formData, costPrice: val })}
                   required
                 />
-                <Input
-                  label="Precio Venta *"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                <MoneyInput
+                  label="Precio Venta"
                   value={formData.salePrice}
-                  onChange={(e) => setFormData({ ...formData, salePrice: e.target.value ? Number(e.target.value) : '' })}
+                  onChange={(val) => setFormData({ ...formData, salePrice: val })}
                   required
                 />
               </div>
@@ -502,21 +576,41 @@ const ProductsPage = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Producto</label>
                 <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 bg-primary-50 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-primary-200">
+                  <div className="w-24 h-24 bg-primary-50 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-primary-200 relative">
                     {formData.imageUrl ? (
                       <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <Image className="w-8 h-8 text-primary-300" />
                     )}
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <Input
-                      label="URL de la imagen"
-                      value={formData.imageUrl}
-                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                      placeholder="https://ejemplo.com/imagen.jpg"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">Ingresa la URL de la imagen del producto</p>
+                  <div className="flex-1 space-y-2">
+                    <div>
+                      <label className="inline-flex items-center gap-2 px-3 py-2 bg-primary-50 text-primary-700 rounded-lg cursor-pointer hover:bg-primary-100 transition-colors text-sm font-medium">
+                        <Image size={16} />
+                        Subir imagen
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploadingImage}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">o</span>
+                      <Input
+                        value={formData.imageUrl}
+                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                        placeholder="URL de imagen..."
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400">JPG, PNG, GIF, WebP. Máx 5MB</p>
                   </div>
                 </div>
               </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import {
   Plus, X, Users, Clock, Search, Loader2, CreditCard, Banknote,
-  Minus, Trash2, ChevronRight, UtensilsCrossed, Coffee, AlertCircle, Printer, User, UserPlus
+  Minus, Trash2, ChevronRight, UtensilsCrossed, Coffee, AlertCircle, Printer, User, UserPlus, Edit2, Truck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
@@ -13,7 +13,7 @@ import { customerService } from '@/core/api/customerService'
 import { invoiceService } from '@/core/api/invoiceService'
 import { RestaurantTable, TableSession, Product, Category, Customer, InvoiceDetail } from '@/types'
 
-const ZONES = ['INTERIOR', 'TERRAZA', 'BAR', 'VIP']
+const DEFAULT_ZONES = ['INTERIOR', 'TERRAZA', 'BAR', 'VIP']
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
   DISPONIBLE: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', label: 'Disponible' },
@@ -87,11 +87,17 @@ const TablesPage = () => {
   const [completedInvoice, setCompletedInvoice] = useState<any>(null)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
 
-  // Create table form
+  // Delivery charge
+  const [includeDelivery, setIncludeDelivery] = useState(false)
+
+  // Create/Edit table form
   const [newTableNumber, setNewTableNumber] = useState('')
   const [newTableName, setNewTableName] = useState('')
   const [newTableCapacity, setNewTableCapacity] = useState('4')
   const [newTableZone, setNewTableZone] = useState('INTERIOR')
+  const [customZone, setCustomZone] = useState('')
+  const [showEditTableModal, setShowEditTableModal] = useState(false)
+  const [editTableData, setEditTableData] = useState<{ id: number; tableNumber: string; name: string; capacity: string; zone: string }>({ id: 0, tableNumber: '', name: '', capacity: '4', zone: 'INTERIOR' })
 
   // ==================== DATA FETCHING ====================
 
@@ -249,14 +255,72 @@ const TablesPage = () => {
     }
   }
 
+  const handleEditTable = async () => {
+    if (!editTableData.id) return
+    setProcessing(true)
+    try {
+      await tableService.update(editTableData.id, {
+        tableNumber: parseInt(editTableData.tableNumber),
+        name: editTableData.name || undefined,
+        capacity: parseInt(editTableData.capacity) || 4,
+        zone: editTableData.zone,
+      })
+      toast.success('Mesa actualizada')
+      setShowEditTableModal(false)
+      await fetchTables()
+      if (selectedTable?.id === editTableData.id) {
+        const updated = await tableService.getById(editTableData.id)
+        setSelectedTable(updated as RestaurantTable)
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Error al actualizar mesa')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handleDeleteTable = async (table: RestaurantTable) => {
+    if (table.status === 'OCUPADA') {
+      toast.error('No se puede eliminar una mesa ocupada')
+      return
+    }
+    if (!confirm(`¿Eliminar Mesa #${table.tableNumber}?`)) return
+    try {
+      await tableService.delete(table.id)
+      toast.success('Mesa eliminada')
+      if (selectedTable?.id === table.id) {
+        setSelectedTable(null)
+        setActiveSession(null)
+      }
+      await fetchTables()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Error al eliminar mesa')
+    }
+  }
+
+  const openEditTableModal = (table: RestaurantTable) => {
+    setEditTableData({
+      id: table.id,
+      tableNumber: String(table.tableNumber),
+      name: table.name || '',
+      capacity: String(table.capacity),
+      zone: table.zone || 'INTERIOR',
+    })
+    setShowEditTableModal(true)
+  }
+
   const handlePayTable = async () => {
     if (!selectedTable || !activeSession) return
     setProcessing(true)
     try {
+      const baseTotal = activeSession.total || 0
+      const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
+      const deliveryAmount = includeDelivery ? 3000 : 0
       const request: PayTableRequest = {
         paymentMethod,
         amountReceived: parseFloat(amountReceived),
         serviceChargePercent: includeServiceCharge ? 10 : 0,
+        deliveryChargeAmount: deliveryAmount,
       }
       const result = await tableService.payTable(selectedTable.id, request) as any
       // Fetch full invoice for printing
@@ -270,6 +334,8 @@ const TablesPage = () => {
       toast.success(`Mesa #${selectedTable.tableNumber} pagada exitosamente`)
       setShowPayModal(false)
       setAmountReceived('')
+      setIncludeDelivery(false)
+      setIncludeServiceCharge(false)
       setSelectedTable(null)
       setActiveSession(null)
       await fetchTables()
@@ -359,13 +425,18 @@ const TablesPage = () => {
 
   const handleCreateTable = async () => {
     if (!newTableNumber) return
+    const zone = newTableZone === '__custom__' ? customZone.trim() : newTableZone
+    if (!zone) {
+      toast.error('Debes especificar una zona')
+      return
+    }
     setProcessing(true)
     try {
       await tableService.create({
         tableNumber: parseInt(newTableNumber),
         name: newTableName || undefined,
         capacity: parseInt(newTableCapacity) || 4,
-        zone: newTableZone,
+        zone,
       })
       toast.success('Mesa creada exitosamente')
       setShowCreateTableModal(false)
@@ -373,6 +444,7 @@ const TablesPage = () => {
       setNewTableName('')
       setNewTableCapacity('4')
       setNewTableZone('INTERIOR')
+      setCustomZone('')
       await fetchTables()
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Error al crear mesa')
@@ -382,6 +454,11 @@ const TablesPage = () => {
   }
 
   // ==================== FILTERS ====================
+
+  const allZones = Array.from(new Set([
+    ...DEFAULT_ZONES,
+    ...tables.map(t => t.zone).filter(Boolean)
+  ]))
 
   const filteredTables = tables.filter(t => {
     if (zoneFilter && t.zone !== zoneFilter) return false
@@ -470,7 +547,7 @@ const TablesPage = () => {
           >
             Todas
           </button>
-          {ZONES.map(zone => (
+          {allZones.map(zone => (
             <button
               key={zone}
               onClick={() => setZoneFilter(zone === zoneFilter ? null : zone)}
@@ -581,12 +658,32 @@ const TablesPage = () => {
                   </h2>
                   <p className="text-sm text-gray-500">{selectedTable.name} - {selectedTable.zone}</p>
                 </div>
-                <button
-                  onClick={() => { setSelectedTable(null); setActiveSession(null) }}
-                  className="p-1.5 rounded-lg hover:bg-white/50 text-gray-400"
-                >
-                  <X size={18} />
-                </button>
+                <div className="flex items-center gap-1">
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={() => openEditTableModal(selectedTable)}
+                        className="p-1.5 rounded-lg hover:bg-white/50 text-gray-500"
+                        title="Editar mesa"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTable(selectedTable)}
+                        className="p-1.5 rounded-lg hover:bg-red-100 text-red-400"
+                        title="Eliminar mesa"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => { setSelectedTable(null); setActiveSession(null) }}
+                    className="p-1.5 rounded-lg hover:bg-white/50 text-gray-400"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1009,99 +1106,122 @@ const TablesPage = () => {
       )}
 
       {/* Pay Modal */}
-      {showPayModal && activeSession && (
+      {showPayModal && activeSession && (() => {
+        const baseTotal = activeSession.total || 0
+        const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
+        const deliveryAmount = includeDelivery ? 3000 : 0
+        const finalTotal = baseTotal + svcAmount + deliveryAmount
+        const recalcAmount = () => {
+          const newBase = activeSession.total || 0
+          const newSvc = includeServiceCharge ? newBase * 0.10 : 0
+          const newDel = includeDelivery ? 3000 : 0
+          return (newBase + newSvc + newDel).toFixed(0)
+        }
+        return (
         <div className="modal-overlay">
           <div className="modal-content p-6 animate-scale-in">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Cobrar Mesa #{selectedTable?.tableNumber}
             </h3>
 
-            {(() => {
-              const baseTotal = activeSession.total || 0
-              const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
-              const finalTotal = baseTotal + svcAmount
-              return (
-                <>
-                  <div className="bg-primary-50 rounded-xl p-4 mb-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal</span>
-                      <span>{formatCurrency(baseTotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1 border-t border-primary-100">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={includeServiceCharge}
-                          onChange={(e) => {
-                            const checked = e.target.checked
-                            setIncludeServiceCharge(checked)
-                            const newFinal = checked ? baseTotal * 1.10 : baseTotal
-                            setAmountReceived(newFinal.toFixed(0))
-                          }}
-                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Servicio (10%)</span>
-                      </label>
-                      <span className={`text-sm font-medium ${includeServiceCharge ? 'text-primary-600' : 'text-gray-400'}`}>
-                        {includeServiceCharge ? formatCurrency(svcAmount) : '$0'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-lg font-bold text-primary-700 pt-1 border-t border-primary-100">
-                      <span>Total a pagar</span>
-                      <span>{formatCurrency(finalTotal)}</span>
-                    </div>
-                  </div>
+            <div className="bg-primary-50 rounded-xl p-4 mb-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Subtotal</span>
+                <span>{formatCurrency(baseTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-t border-primary-100">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeServiceCharge}
+                    onChange={(e) => {
+                      setIncludeServiceCharge(e.target.checked)
+                      const newSvc = e.target.checked ? baseTotal * 0.10 : 0
+                      const newTotal = baseTotal + newSvc + deliveryAmount
+                      setAmountReceived(newTotal.toFixed(0))
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Servicio (10%)</span>
+                </label>
+                <span className={`text-sm font-medium ${includeServiceCharge ? 'text-primary-600' : 'text-gray-400'}`}>
+                  {includeServiceCharge ? formatCurrency(svcAmount) : '$0'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-t border-primary-100">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeDelivery}
+                    onChange={(e) => {
+                      setIncludeDelivery(e.target.checked)
+                      const newDel = e.target.checked ? 3000 : 0
+                      const newTotal = baseTotal + svcAmount + newDel
+                      setAmountReceived(newTotal.toFixed(0))
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Truck size={14} /> Domicilio
+                  </span>
+                </label>
+                <span className={`text-sm font-medium ${includeDelivery ? 'text-primary-600' : 'text-gray-400'}`}>
+                  {includeDelivery ? formatCurrency(3000) : '$0'}
+                </span>
+              </div>
+              <div className="flex justify-between text-lg font-bold text-primary-700 pt-1 border-t border-primary-100">
+                <span>Total a pagar</span>
+                <span>{formatCurrency(finalTotal)}</span>
+              </div>
+            </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => setPaymentMethod('EFECTIVO')}
-                          className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
-                            paymentMethod === 'EFECTIVO' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
-                          }`}
-                        >
-                          <Banknote size={18} />
-                          Efectivo
-                        </button>
-                        <button
-                          onClick={() => {
-                            setPaymentMethod('TRANSFERENCIA')
-                            setAmountReceived(String(finalTotal))
-                          }}
-                          className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
-                            paymentMethod === 'TRANSFERENCIA' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
-                          }`}
-                        >
-                          <CreditCard size={18} />
-                          Transferencia
-                        </button>
-                      </div>
-                    </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPaymentMethod('EFECTIVO')}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                      paymentMethod === 'EFECTIVO' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    <Banknote size={18} />
+                    Efectivo
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPaymentMethod('TRANSFERENCIA')
+                      setAmountReceived(String(finalTotal))
+                    }}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                      paymentMethod === 'TRANSFERENCIA' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    <CreditCard size={18} />
+                    Transferencia
+                  </button>
+                </div>
+              </div>
 
-                    {paymentMethod === 'EFECTIVO' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Monto recibido</label>
-                        <input
-                          type="number"
-                          value={amountReceived}
-                          onChange={(e) => setAmountReceived(e.target.value)}
-                          className="input-field"
-                          min={finalTotal}
-                        />
-                        {parseFloat(amountReceived) >= finalTotal && (
-                          <div className="flex justify-between text-lg font-bold text-green-600 mt-2">
-                            <span>Cambio</span>
-                            <span>{formatCurrency(parseFloat(amountReceived) - finalTotal)}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )
-            })()}
+              {paymentMethod === 'EFECTIVO' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto recibido</label>
+                  <input
+                    type="number"
+                    value={amountReceived}
+                    onChange={(e) => setAmountReceived(e.target.value)}
+                    className="input-field"
+                    min={finalTotal}
+                  />
+                  {parseFloat(amountReceived) >= finalTotal && (
+                    <div className="flex justify-between text-lg font-bold text-green-600 mt-2">
+                      <span>Cambio</span>
+                      <span>{formatCurrency(parseFloat(amountReceived) - finalTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-3 mt-6">
               <button
@@ -1112,7 +1232,7 @@ const TablesPage = () => {
               </button>
               <button
                 onClick={handlePayTable}
-                disabled={processing || parseFloat(amountReceived) < (activeSession.total || 0)}
+                disabled={processing || parseFloat(amountReceived) < finalTotal}
                 className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CreditCard size={18} />}
@@ -1121,7 +1241,8 @@ const TablesPage = () => {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Create Table Modal */}
       {showCreateTableModal && (
@@ -1166,11 +1287,25 @@ const TablesPage = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Zona</label>
                   <select
                     value={newTableZone}
-                    onChange={(e) => setNewTableZone(e.target.value)}
+                    onChange={(e) => {
+                      setNewTableZone(e.target.value)
+                      if (e.target.value !== '__custom__') setCustomZone('')
+                    }}
                     className="input-field"
                   >
-                    {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+                    {allZones.map(z => <option key={z} value={z}>{z}</option>)}
+                    <option value="__custom__">+ Nueva zona...</option>
                   </select>
+                  {newTableZone === '__custom__' && (
+                    <input
+                      type="text"
+                      value={customZone}
+                      onChange={(e) => setCustomZone(e.target.value.toUpperCase())}
+                      className="input-field mt-2"
+                      placeholder="Nombre de la nueva zona"
+                      autoFocus
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -1187,6 +1322,74 @@ const TablesPage = () => {
                 className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
                 {processing ? 'Creando...' : 'Crear Mesa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Table Modal */}
+      {showEditTableModal && (
+        <div className="modal-overlay">
+          <div className="modal-content p-6 animate-scale-in">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Editar Mesa</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número de Mesa *</label>
+                <input
+                  type="number"
+                  value={editTableData.tableNumber}
+                  onChange={(e) => setEditTableData({ ...editTableData, tableNumber: e.target.value })}
+                  className="input-field"
+                  min={1}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre (opcional)</label>
+                <input
+                  type="text"
+                  value={editTableData.name}
+                  onChange={(e) => setEditTableData({ ...editTableData, name: e.target.value })}
+                  className="input-field"
+                  placeholder="Ej: Mesa VIP 1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Capacidad</label>
+                  <input
+                    type="number"
+                    value={editTableData.capacity}
+                    onChange={(e) => setEditTableData({ ...editTableData, capacity: e.target.value })}
+                    className="input-field"
+                    min={1}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Zona</label>
+                  <select
+                    value={editTableData.zone}
+                    onChange={(e) => setEditTableData({ ...editTableData, zone: e.target.value })}
+                    className="input-field"
+                  >
+                    {allZones.map(z => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowEditTableModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEditTable}
+                disabled={processing || !editTableData.tableNumber}
+                className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-50"
+              >
+                {processing ? 'Guardando...' : 'Guardar Cambios'}
               </button>
             </div>
           </div>

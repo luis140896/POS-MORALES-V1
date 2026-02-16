@@ -14,6 +14,7 @@ export interface CreateSaleRequest {
   paymentMethod: string
   discountPercent?: number
   serviceChargePercent?: number
+  deliveryChargeAmount?: number
   amountReceived: number
   notes?: string
   details: SaleDetailRequest[]
@@ -29,8 +30,8 @@ export interface TodayStats {
 }
 
 export const invoiceService = {
-  getAll: (page = 0, size = 20) => 
-    api.get<PaginatedResponse<Invoice>>(`/invoices?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 200) => 
+    api.get<PaginatedResponse<Invoice>>(`/invoices?page=${page}&size=${size}&sort=createdAt,desc`),
   
   getById: (id: number) => api.get<Invoice>(`/invoices/${id}`),
   

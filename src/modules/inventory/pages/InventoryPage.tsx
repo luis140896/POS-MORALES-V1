@@ -61,6 +61,9 @@ const InventoryPage = () => {
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [filterCategory, setFilterCategory] = useState<number | ''>('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'normal' | 'low' | 'out'>('all')
+  const [showFilters, setShowFilters] = useState(false)
 
   const getProductId = (item: any): number | undefined => item?.product?.id ?? item?.productId
   const getProductCode = (item: any): string => item?.product?.code ?? item?.productCode ?? ''
@@ -119,10 +122,19 @@ const InventoryPage = () => {
     return { color: 'bg-green-500', text: 'Normal' }
   }
 
+  const getProductCategoryId = (item: any): number | undefined => item?.product?.categoryId ?? item?.product?.category?.id ?? item?.categoryId
+
   const filteredInventory = inventory.filter((i: any) => {
     const term = searchTerm.toLowerCase()
-    return getProductCode(i).toLowerCase().includes(term) || getProductName(i).toLowerCase().includes(term)
+    if (term && !getProductCode(i).toLowerCase().includes(term) && !getProductName(i).toLowerCase().includes(term)) return false
+    if (filterCategory && getProductCategoryId(i) !== filterCategory) return false
+    if (filterStatus === 'out' && i.quantity !== 0) return false
+    if (filterStatus === 'low' && !(i.quantity > 0 && i.quantity <= i.minStock)) return false
+    if (filterStatus === 'normal' && (i.quantity === 0 || i.quantity <= i.minStock)) return false
+    return true
   })
+
+  const activeFilterCount = (filterCategory ? 1 : 0) + (filterStatus !== 'all' ? 1 : 0)
 
   const openAdjustModal = (inv: Inventory, type: 'add' | 'remove') => {
     setAdjustModal({ inventory: inv, type })
@@ -476,11 +488,47 @@ const InventoryPage = () => {
               className="input-field pl-12"
             />
           </div>
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
             <Filter size={20} />
-            Filtrar
+            Filtrar{activeFilterCount > 0 && ` (${activeFilterCount})`}
           </Button>
         </div>
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600 font-medium">Categoría:</label>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value ? Number(e.target.value) : '')}
+                className="input-field py-1.5 text-sm w-40"
+              >
+                <option value="">Todas</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600 font-medium">Estado:</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="input-field py-1.5 text-sm w-36"
+              >
+                <option value="all">Todos</option>
+                <option value="normal">Normal</option>
+                <option value="low">Stock bajo</option>
+                <option value="out">Sin stock</option>
+              </select>
+            </div>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setFilterCategory(''); setFilterStatus('all') }}
+                className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-medium"
+              >
+                <X size={14} /> Limpiar filtros
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Inventory Table */}

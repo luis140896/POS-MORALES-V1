@@ -14,6 +14,7 @@ import InvoicesPage from '@/modules/invoices/pages/InvoicesPage'
 import CustomersPage from '@/modules/customers/pages/CustomersPage'
 import ReportsPage from '@/modules/reports/pages/ReportsPage'
 import UsersPage from '@/modules/users/pages/UsersPage'
+import RolesPage from '@/modules/roles/pages/RolesPage'
 import SettingsPage from '@/modules/settings/pages/SettingsPage'
 import TablesPage from '@/modules/tables/pages/TablesPage'
 import KitchenPage from '@/modules/kitchen/pages/KitchenPage'
@@ -107,7 +108,7 @@ function App() {
           <Route
             path="/pos"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'CAJERO', 'SUPERVISOR']}>
+              <RoleGuard requiredPermissions={['pos.sell']}>
                 <POSPage />
               </RoleGuard>
             }
@@ -115,7 +116,7 @@ function App() {
           <Route
             path="/tables"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'CAJERO', 'SUPERVISOR', 'MESERO']}>
+              <RoleGuard requiredPermissions={['tables.view']}>
                 <TablesPage />
               </RoleGuard>
             }
@@ -123,7 +124,7 @@ function App() {
           <Route
             path="/products"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'INVENTARIO']}>
+              <RoleGuard requiredPermissions={['products.view']}>
                 <ProductsPage />
               </RoleGuard>
             }
@@ -131,7 +132,7 @@ function App() {
           <Route
             path="/categories"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'INVENTARIO']}>
+              <RoleGuard requiredPermissions={['categories.view']}>
                 <CategoriesPage />
               </RoleGuard>
             }
@@ -139,7 +140,7 @@ function App() {
           <Route
             path="/inventory"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'INVENTARIO']}>
+              <RoleGuard requiredPermissions={['inventory.view']}>
                 <InventoryPage />
               </RoleGuard>
             }
@@ -147,7 +148,7 @@ function App() {
           <Route
             path="/invoices"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'CAJERO', 'SUPERVISOR']}>
+              <RoleGuard requiredPermissions={['invoices.view']}>
                 <InvoicesPage />
               </RoleGuard>
             }
@@ -155,7 +156,7 @@ function App() {
           <Route
             path="/customers"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'CAJERO', 'SUPERVISOR']}>
+              <RoleGuard requiredPermissions={['customers.view']}>
                 <CustomersPage />
               </RoleGuard>
             }
@@ -163,7 +164,7 @@ function App() {
           <Route
             path="/reports"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'SUPERVISOR', 'REPORTES']}>
+              <RoleGuard requiredPermissions={['reports.view']}>
                 <ReportsPage />
               </RoleGuard>
             }
@@ -171,15 +172,23 @@ function App() {
           <Route
             path="/users"
             element={
-              <RoleGuard allowedRoles={['ADMIN']}>
+              <RoleGuard requiredPermissions={['users.manage']}>
                 <UsersPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/roles"
+            element={
+              <RoleGuard requiredPermissions={['users.manage']}>
+                <RolesPage />
               </RoleGuard>
             }
           />
           <Route
             path="/kitchen"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'COCINERO', 'SUPERVISOR', 'CAJERO']}>
+              <RoleGuard requiredPermissions={['kitchen.view']}>
                 <KitchenPage />
               </RoleGuard>
             }
@@ -187,7 +196,7 @@ function App() {
           <Route
             path="/settings"
             element={
-              <RoleGuard allowedRoles={['ADMIN', 'SUPERVISOR']}>
+              <RoleGuard requiredPermissions={['settings.view']}>
                 <SettingsPage />
               </RoleGuard>
             }

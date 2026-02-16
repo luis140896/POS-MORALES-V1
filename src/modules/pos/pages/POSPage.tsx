@@ -11,6 +11,7 @@ import { customerService } from '@/core/api/customerService'
 import { invoiceService } from '@/core/api/invoiceService'
 import { tableService } from '@/core/api/tableService'
 import { Product, Category, Customer, RestaurantTable } from '@/types'
+import { printInvoice } from '@/shared/utils/printInvoice'
 
 interface ProductWithCategory extends Product {
   categoryId: number
@@ -291,6 +292,9 @@ interface CategoriesPanelProps {
   categories: Category[]
   selectedCategory: number | null
   setSelectedCategory: (categoryId: number | null) => void
+  parentCategoryId: number | null
+  onCategoryClick: (catId: number) => void
+  onBackToParent: () => void
   organizing: boolean
   onStartOrganize: () => void
   onAcceptOrganize: () => void
@@ -304,6 +308,9 @@ const CategoriesPanel = ({
   categories,
   selectedCategory,
   setSelectedCategory,
+  parentCategoryId,
+  onCategoryClick,
+  onBackToParent,
   organizing,
   onStartOrganize,
   onAcceptOrganize,
@@ -368,8 +375,18 @@ const CategoriesPanel = ({
 
       <div className="bg-white rounded-2xl shadow-soft p-2 sm:p-3 h-auto max-h-[120px] sm:max-h-[220px] overflow-y-auto overflow-x-auto w-full border border-gray-100">
         <div className="flex flex-nowrap sm:flex-wrap gap-2 sm:gap-3 pb-1 sm:pb-3">
+          {parentCategoryId !== null && (
+            <button
+              onClick={onBackToParent}
+              className="inline-flex items-center gap-1 px-3 py-2.5 rounded-xl transition-all border bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300"
+              title="Volver"
+            >
+              <span className="text-xs">←</span>
+              <span className="text-xs font-medium">Volver</span>
+            </button>
+          )}
           <button
-            onClick={() => setSelectedCategory(null)}
+            onClick={() => { setSelectedCategory(null); if (parentCategoryId === null) { /* already at root */ } }}
             className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all border ${
               selectedCategory === null
                 ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-soft border-primary-600'
@@ -383,7 +400,7 @@ const CategoriesPanel = ({
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
+              onClick={() => onCategoryClick(cat.id)}
               draggable={organizing}
               onDragStart={() => {
                 if (!organizing) return
@@ -430,13 +447,20 @@ interface PaymentModalProps {
   total: number
   includeServiceCharge: boolean
   setIncludeServiceCharge: (value: boolean) => void
+  includeDelivery: boolean
+  setIncludeDelivery: (value: boolean) => void
   amountReceived: string
   setAmountReceived: (value: string) => void
   processing: boolean
   onClose: () => void
   onConfirm: () => Promise<void>
+  onPrintPreBill: () => void
   formatCurrency: (value: number) => string
+  items: Array<{ id: number; name: string; price: number; quantity: number; notes?: string }>
+  customerName: string
 }
+
+const DELIVERY_CHARGE = 3000
 
 const PaymentModal = ({
   show,
@@ -446,17 +470,29 @@ const PaymentModal = ({
   total,
   includeServiceCharge,
   setIncludeServiceCharge,
+  includeDelivery,
+  setIncludeDelivery,
   amountReceived,
   setAmountReceived,
   processing,
   onClose,
   onConfirm,
+  onPrintPreBill,
   formatCurrency,
+  items,
+  customerName,
 }: PaymentModalProps) => {
   if (!show) return null
 
   const serviceChargeAmount = includeServiceCharge ? total * 0.10 : 0
-  const finalTotal = total + serviceChargeAmount
+  const deliveryAmount = includeDelivery ? DELIVERY_CHARGE : 0
+  const finalTotal = total + serviceChargeAmount + deliveryAmount
+
+  const recalcAmount = (svc: boolean, dlv: boolean) => {
+    const svcAmt = svc ? total * 0.10 : 0
+    const dlvAmt = dlv ? DELIVERY_CHARGE : 0
+    setAmountReceived((total + svcAmt + dlvAmt).toFixed(0))
+  }
 
   return (
     <div className="modal-overlay">
@@ -474,7 +510,7 @@ const PaymentModal = ({
           </button>
         </div>
 
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 mb-6">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Subtotal</span>
             <span>{formatCurrency(subtotal)}</span>
@@ -486,25 +522,45 @@ const PaymentModal = ({
             </div>
           )}
 
-          {/* Service charge toggle */}
-          <div className="flex items-center justify-between py-2 border-t border-b border-gray-100">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeServiceCharge}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  setIncludeServiceCharge(checked)
-                  const newFinal = checked ? total * 1.10 : total
-                  setAmountReceived(newFinal.toFixed(0))
-                }}
-                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Servicio (10%)</span>
-            </label>
-            <span className={`text-sm font-medium ${includeServiceCharge ? 'text-primary-600' : 'text-gray-400'}`}>
-              {includeServiceCharge ? formatCurrency(serviceChargeAmount) : '$0'}
-            </span>
+          {/* Opciones adicionales */}
+          <div className="space-y-2 py-2 border-t border-b border-gray-100">
+            {/* Service charge toggle */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeServiceCharge}
+                  onChange={(e) => {
+                    setIncludeServiceCharge(e.target.checked)
+                    recalcAmount(e.target.checked, includeDelivery)
+                  }}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Servicio (10%)</span>
+              </label>
+              <span className={`text-sm font-medium ${includeServiceCharge ? 'text-primary-600' : 'text-gray-400'}`}>
+                {includeServiceCharge ? formatCurrency(serviceChargeAmount) : '$0'}
+              </span>
+            </div>
+
+            {/* Delivery charge toggle */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeDelivery}
+                  onChange={(e) => {
+                    setIncludeDelivery(e.target.checked)
+                    recalcAmount(includeServiceCharge, e.target.checked)
+                  }}
+                  className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Domicilio</span>
+              </label>
+              <span className={`text-sm font-medium ${includeDelivery ? 'text-amber-600' : 'text-gray-400'}`}>
+                {includeDelivery ? formatCurrency(DELIVERY_CHARGE) : '$0'}
+              </span>
+            </div>
           </div>
 
           <div className="flex justify-between text-lg font-bold pt-1">
@@ -556,6 +612,14 @@ const PaymentModal = ({
               'Confirmar Venta'
             )}
           </Button>
+          <button
+            type="button"
+            onClick={onPrintPreBill}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            <Printer size={16} />
+            Imprimir Pre-cuenta
+          </button>
           <Button variant="secondary" className="w-full" onClick={onClose} disabled={processing}>
             Cancelar
           </Button>
@@ -574,6 +638,7 @@ const POSPage = () => {
   const [categories, setCategories] = useState<Category[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [parentCategoryId, setParentCategoryId] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
@@ -589,6 +654,7 @@ const POSPage = () => {
   const [completedInvoice, setCompletedInvoice] = useState<any>(null)
   const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
   const [includeServiceCharge, setIncludeServiceCharge] = useState(false)
+  const [includeDelivery, setIncludeDelivery] = useState(false)
 
   // Table selection for POS
   const [tables, setTables] = useState<RestaurantTable[]>([])
@@ -673,14 +739,39 @@ const POSPage = () => {
     setCustomerSearch('')
   }
 
-  const filteredProducts = products.filter(p => 
-    (selectedCategory === null || p.categoryId === selectedCategory) &&
-    (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.code.includes(searchTerm))
-  )
+  // Get all child category IDs for a parent
+  const getChildCategoryIds = (parentId: number): number[] => {
+    const children = categories.filter(c => c.parentId === parentId)
+    return children.map(c => c.id)
+  }
+
+  const filteredProducts = products.filter(p => {
+    if (selectedCategory !== null) {
+      // If a specific category is selected, show its products + children's products
+      const childIds = getChildCategoryIds(selectedCategory)
+      const validIds = [selectedCategory, ...childIds]
+      if (!validIds.includes(p.categoryId)) return false
+    } else if (parentCategoryId !== null) {
+      // Browsing inside a parent: show products of parent + all children
+      const childIds = getChildCategoryIds(parentCategoryId)
+      const validIds = [parentCategoryId, ...childIds]
+      if (!validIds.includes(p.categoryId)) return false
+    }
+    return p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.code.includes(searchTerm)
+  })
 
   const categoriesToShow: Category[] = (() => {
-    if (!isOrganizingCategories || !draftCategoryOrder) return categories
-    const byId = new Map(categories.map(c => [c.id, c]))
+    let base: Category[]
+    if (parentCategoryId !== null) {
+      // Show children of the selected parent
+      base = categories.filter(c => c.parentId === parentCategoryId)
+    } else {
+      // Show root categories (no parent) or all if none have parentId
+      const hasHierarchy = categories.some(c => c.parentId)
+      base = hasHierarchy ? categories.filter(c => !c.parentId) : categories
+    }
+    if (!isOrganizingCategories || !draftCategoryOrder) return base
+    const byId = new Map(base.map(c => [c.id, c]))
     const ordered: Category[] = []
     for (const id of draftCategoryOrder) {
       const cat = byId.get(id)
@@ -688,6 +779,23 @@ const POSPage = () => {
     }
     return ordered
   })()
+
+  const handleCategoryClick = (catId: number) => {
+    const children = categories.filter(c => c.parentId === catId)
+    if (children.length > 0 && parentCategoryId !== catId) {
+      // Navigate into this parent category
+      setParentCategoryId(catId)
+      setSelectedCategory(null)
+    } else {
+      // Leaf category or already inside parent - toggle selection
+      setSelectedCategory(selectedCategory === catId ? null : catId)
+    }
+  }
+
+  const handleBackToParent = () => {
+    setParentCategoryId(null)
+    setSelectedCategory(null)
+  }
 
   const handleStartOrganizeCategories = () => {
     setIsOrganizingCategories(true)
@@ -849,6 +957,7 @@ const POSPage = () => {
           paymentMethod: paymentMethod,
           discountPercent: discountType === 'percent' ? discount : 0,
           serviceChargePercent: includeServiceCharge ? 10 : 0,
+          deliveryChargeAmount: includeDelivery ? 3000 : 0,
           amountReceived: parseFloat(amountReceived),
           notes: notes,
           details: items.map(item => ({
@@ -888,64 +997,30 @@ const POSPage = () => {
 
   const handlePrintInvoice = () => {
     if (!completedInvoice) return
-    const settings = JSON.parse(localStorage.getItem('pos_settings') || '{}')
-    const companyName = settings?.company?.companyName || 'Mi Empresa'
-    const inv = completedInvoice
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Factura ${inv.invoiceNumber}</title>
-            <style>
-              body { font-family: 'Courier New', monospace; padding: 10px; max-width: 300px; margin: 0 auto; font-size: 12px; }
-              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-              .header h1 { margin: 0 0 2px; font-size: 16px; text-transform: uppercase; }
-              .header .invoice-num { font-size: 13px; font-weight: bold; }
-              .header p { margin: 2px 0; font-size: 11px; }
-              .info { margin-bottom: 8px; }
-              .info div { margin: 2px 0; }
-              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 6px 0; }
-              .item { display: flex; justify-content: space-between; margin: 3px 0; }
-              .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
-              .total-final { font-size: 15px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
-              .payment-info { border-top: 1px dashed #000; margin-top: 8px; padding-top: 6px; }
-              .footer { text-align: center; margin-top: 15px; font-size: 10px; color: #666; border-top: 1px dashed #000; padding-top: 8px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>${companyName}</h1>
-              <div class="invoice-num">N° ${inv.invoiceNumber}</div>
-              <p>${formatDate(inv.createdAt)}</p>
-            </div>
-            <div class="info">
-              <div>Cliente: ${inv.customer?.fullName || inv.customerName || 'Cliente General'}</div>
-              <div>Cajero: ${inv.userName || '-'}</div>
-            </div>
-            <div class="items">
-              ${(inv.details || []).map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
-            </div>
-            <div class="totals">
-              <div><span>Subtotal:</span><span>${formatCurrency(inv.subtotal)}</span></div>
-              ${inv.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
-              ${inv.serviceChargeAmount > 0 ? `<div><span>Servicio (${inv.serviceChargePercent}%):</span><span>${formatCurrency(inv.serviceChargeAmount)}</span></div>` : ''}
-              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(inv.total)}</span></div>
-            </div>
-            <div class="payment-info">
-              <div><span>Método:</span><span>${getPaymentMethodLabel(inv.paymentMethod)}</span></div>
-              ${inv.amountReceived > 0 ? `<div><span>Recibido:</span><span>${formatCurrency(inv.amountReceived)}</span></div>` : ''}
-              ${inv.changeAmount > 0 ? `<div style="font-weight:bold;"><span>Cambio:</span><span>${formatCurrency(inv.changeAmount)}</span></div>` : ''}
-            </div>
-            <div class="footer">
-              <p>¡Gracias por su compra!</p>
-            </div>
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
-      printWindow.print()
-    }
+    printInvoice(completedInvoice)
+  }
+
+  const handlePrintPreBill = () => {
+    const serviceChargeAmount = includeServiceCharge ? total * 0.10 : 0
+    const deliveryAmount = includeDelivery ? 3000 : 0
+    const finalTotal = total + serviceChargeAmount + deliveryAmount
+    printInvoice({
+      invoiceNumber: 'PRE-CUENTA',
+      createdAt: new Date().toISOString(),
+      customerName: customerName,
+      details: items.map(item => ({
+        quantity: item.quantity,
+        productName: item.name,
+        subtotal: item.price * item.quantity,
+        notes: item.notes,
+      })),
+      subtotal,
+      discountAmount,
+      serviceChargeAmount: serviceChargeAmount,
+      serviceChargePercent: includeServiceCharge ? 10 : 0,
+      deliveryChargeAmount: deliveryAmount,
+      total: finalTotal,
+    }, { isPreBill: true })
   }
 
   return (
@@ -970,6 +1045,9 @@ const POSPage = () => {
           categories={categoriesToShow}
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
+          parentCategoryId={parentCategoryId}
+          onCategoryClick={handleCategoryClick}
+          onBackToParent={handleBackToParent}
           organizing={isOrganizingCategories}
           onStartOrganize={handleStartOrganizeCategories}
           onAcceptOrganize={handleAcceptOrganizeCategories}
@@ -1299,12 +1377,17 @@ const POSPage = () => {
         total={total}
         includeServiceCharge={includeServiceCharge}
         setIncludeServiceCharge={setIncludeServiceCharge}
+        includeDelivery={includeDelivery}
+        setIncludeDelivery={setIncludeDelivery}
         amountReceived={amountReceived}
         setAmountReceived={setAmountReceived}
         processing={processing}
         onClose={() => setShowPaymentModal(false)}
         onConfirm={handleConfirmSale}
+        onPrintPreBill={handlePrintPreBill}
         formatCurrency={formatCurrency}
+        items={items}
+        customerName={customerName}
       />
 
       <CustomerSelectionModal

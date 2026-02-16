@@ -10,6 +10,7 @@ import {
   FileText,
   Users,
   BarChart3,
+  Shield,
   Settings,
   ChevronLeft,
   Store,
@@ -26,17 +27,18 @@ interface SidebarProps {
 
 const menuItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/pos', icon: ShoppingCart, label: 'Punto de Venta', allowedRoles: ['ADMIN', 'CAJERO', 'SUPERVISOR'] },
-  { path: '/tables', icon: UtensilsCrossed, label: 'Mesas', allowedRoles: ['ADMIN', 'CAJERO', 'SUPERVISOR', 'MESERO'] },
-  { path: '/kitchen', icon: ChefHat, label: 'Cocina', allowedRoles: ['ADMIN', 'COCINERO', 'SUPERVISOR', 'CAJERO'] },
-  { path: '/products', icon: Package, label: 'Productos', allowedRoles: ['ADMIN', 'INVENTARIO'] },
-  { path: '/categories', icon: FolderTree, label: 'Categorías', allowedRoles: ['ADMIN', 'INVENTARIO'] },
-  { path: '/inventory', icon: Warehouse, label: 'Inventario', allowedRoles: ['ADMIN', 'INVENTARIO'] },
-  { path: '/invoices', icon: FileText, label: 'Facturas', allowedRoles: ['ADMIN', 'CAJERO', 'SUPERVISOR'] },
-  { path: '/customers', icon: Users, label: 'Clientes', allowedRoles: ['ADMIN', 'CAJERO', 'SUPERVISOR'] },
-  { path: '/reports', icon: BarChart3, label: 'Reportes', allowedRoles: ['ADMIN', 'SUPERVISOR', 'REPORTES'] },
-  { path: '/users', icon: Users, label: 'Usuarios', allowedRoles: ['ADMIN'] },
-  { path: '/settings', icon: Settings, label: 'Configuración', allowedRoles: ['ADMIN', 'SUPERVISOR'] },
+  { path: '/pos', icon: ShoppingCart, label: 'Punto de Venta', requiredPermissions: ['pos.sell'] },
+  { path: '/tables', icon: UtensilsCrossed, label: 'Mesas', requiredPermissions: ['tables.view'] },
+  { path: '/kitchen', icon: ChefHat, label: 'Cocina', requiredPermissions: ['kitchen.view'] },
+  { path: '/products', icon: Package, label: 'Productos', requiredPermissions: ['products.view'] },
+  { path: '/categories', icon: FolderTree, label: 'Categorías', requiredPermissions: ['categories.view'] },
+  { path: '/inventory', icon: Warehouse, label: 'Inventario', requiredPermissions: ['inventory.view'] },
+  { path: '/invoices', icon: FileText, label: 'Facturas', requiredPermissions: ['invoices.view'] },
+  { path: '/customers', icon: Users, label: 'Clientes', requiredPermissions: ['customers.view'] },
+  { path: '/reports', icon: BarChart3, label: 'Reportes', requiredPermissions: ['reports.view'] },
+  { path: '/users', icon: Users, label: 'Usuarios', requiredPermissions: ['users.manage'] },
+  { path: '/roles', icon: Shield, label: 'Roles', requiredPermissions: ['users.manage'] },
+  { path: '/settings', icon: Settings, label: 'Configuración', requiredPermissions: ['settings.view'] },
 ]
 
 const Sidebar = ({ isOpen, isMobile = false, onToggle, onClose }: SidebarProps) => {
@@ -44,9 +46,15 @@ const Sidebar = ({ isOpen, isMobile = false, onToggle, onClose }: SidebarProps) 
   const { user } = useSelector((state: RootState) => state.auth)
 
   const canAccess = (item: any) => {
-    if (!item.allowedRoles || item.allowedRoles.length === 0) return true
-    const role = (user as any)?.role
-    return role ? item.allowedRoles.includes(role) : false
+    if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true
+    const roleName =
+      typeof (user as any)?.role === 'string' ? ((user as any)?.role as string) : ((user as any)?.role?.name as string)
+
+    if (roleName === 'ADMIN') return true
+
+    const permissions =
+      ((user as any)?.permissions as string[] | undefined) || ((user as any)?.role?.permissions as string[] | undefined) || []
+    return item.requiredPermissions.every((p: string) => permissions.includes(p))
   }
 
   // On mobile: always show labels when open, slide from left

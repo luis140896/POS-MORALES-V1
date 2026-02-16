@@ -1,20 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
-import { Calendar, Download, BarChart3, TrendingUp, DollarSign, Loader2, Package, CreditCard } from 'lucide-react'
+import { Download, BarChart3, TrendingUp, DollarSign, Loader2, Package, CreditCard } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import { reportService, SalesSummary, TopProduct, TopCustomer, InventorySummary, PaymentMethodStat } from '@/core/api/reportService'
 import { invoiceService } from '@/core/api/invoiceService'
 import { RootState } from '@/app/store'
 import XLSX from 'xlsx-js-style'
-
-// Helper: local date as YYYY-MM-DD (avoids UTC shift from toISOString)
-const toLocalDateStr = (d: Date) => {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+import DateRangeFilter, { toLocalDateStr } from '@/shared/components/DateRangeFilter'
 
 const ReportsPage = () => {
   const { theme, company } = useSelector((state: RootState) => state.settings)
@@ -78,31 +71,6 @@ const ReportsPage = () => {
       default:
         return method
     }
-  }
-
-  const setQuickDate = (type: 'today' | 'week' | 'month' | 'year') => {
-    const today = new Date()
-    let start = new Date()
-
-    switch (type) {
-      case 'today':
-        start = today
-        break
-      case 'week':
-        start = new Date(today.setDate(today.getDate() - 7))
-        break
-      case 'month':
-        start = new Date(today.getFullYear(), today.getMonth(), 1)
-        break
-      case 'year':
-        start = new Date(today.getFullYear(), 0, 1)
-        break
-    }
-
-    setDateRange({
-      start: toLocalDateStr(start),
-      end: toLocalDateStr(new Date())
-    })
   }
 
   useEffect(() => {
@@ -402,33 +370,10 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      {/* Date Filter */}
-      <div className="card">
-        <div className="flex flex-wrap gap-3 sm:gap-4 items-center">
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Calendar size={20} className="text-gray-400 hidden sm:block" />
-            <input
-              type="date"
-              className="input-field flex-1 sm:flex-none"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-            />
-            <span className="text-gray-400">a</span>
-            <input
-              type="date"
-              className="input-field flex-1 sm:flex-none"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setQuickDate('today')} className="btn-ghost text-sm">Hoy</button>
-            <button onClick={() => setQuickDate('week')} className="btn-ghost text-sm">Semana</button>
-            <button onClick={() => setQuickDate('month')} className="btn-ghost text-sm">Mes</button>
-            <button onClick={() => setQuickDate('year')} className="btn-ghost text-sm">Año</button>
-          </div>
-          <Button variant="primary" size="sm" onClick={exportToExcel}><Download size={18} /> Exportar</Button>
-        </div>
+      {/* Date Filter - compact reusable */}
+      <div className="flex flex-wrap items-center gap-3">
+        <DateRangeFilter dateRange={dateRange} setDateRange={setDateRange} />
+        <Button variant="primary" size="sm" onClick={exportToExcel}><Download size={18} /> Exportar</Button>
       </div>
 
       {loading ? (

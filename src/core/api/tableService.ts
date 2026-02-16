@@ -39,6 +39,7 @@ export interface PayTableRequest {
   amountReceived: number
   discountPercent?: number
   serviceChargePercent?: number
+  deliveryChargeAmount?: number
   notes?: string
 }
 

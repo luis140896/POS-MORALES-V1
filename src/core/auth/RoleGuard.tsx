@@ -12,10 +12,18 @@ interface RoleGuardProps {
 const RoleGuard = ({ allowedRoles, requiredPermissions, children }: RoleGuardProps) => {
   const { user } = useSelector((state: RootState) => state.auth)
 
-  const role = user?.role
-  const permissions = user?.permissions || []
+  const roleName =
+    typeof (user as any)?.role === 'string' ? ((user as any)?.role as string) : ((user as any)?.role?.name as string)
 
-  const roleOk = !allowedRoles || allowedRoles.length === 0 || (role ? allowedRoles.includes(role) : false)
+  const permissions =
+    ((user as any)?.permissions as string[] | undefined) || ((user as any)?.role?.permissions as string[] | undefined) || []
+
+  if (roleName === 'ADMIN') {
+    return <>{children}</>
+  }
+
+  const roleOk =
+    !allowedRoles || allowedRoles.length === 0 || (roleName ? allowedRoles.includes(roleName) : false)
   const permOk =
     !requiredPermissions ||
     requiredPermissions.length === 0 ||

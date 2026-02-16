@@ -1,10 +1,34 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit2, Trash2, Shield, X, Loader2 } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Shield, X, Loader2, Check, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import Input from '@/shared/components/ui/Input'
 import { userService, CreateUserRequest } from '@/core/api/userService'
 import { User, Role } from '@/types'
+
+const MODULE_PERMISSIONS: Record<string, { label: string; color: string; permissions: string[] }> = {
+  pos: { label: 'POS', color: 'bg-green-100 text-green-700', permissions: ['pos.sell', 'pos.discount', 'pos.void'] },
+  products: { label: 'Productos', color: 'bg-blue-100 text-blue-700', permissions: ['products.view', 'products.create', 'products.edit', 'products.delete'] },
+  categories: { label: 'Categor\u00edas', color: 'bg-indigo-100 text-indigo-700', permissions: ['categories.view', 'categories.create', 'categories.edit', 'categories.delete'] },
+  inventory: { label: 'Inventario', color: 'bg-amber-100 text-amber-700', permissions: ['inventory.view', 'inventory.adjust'] },
+  invoices: { label: 'Facturas', color: 'bg-purple-100 text-purple-700', permissions: ['invoices.view', 'invoices.void'] },
+  customers: { label: 'Clientes', color: 'bg-pink-100 text-pink-700', permissions: ['customers.view', 'customers.create', 'customers.edit'] },
+  tables: { label: 'Mesas', color: 'bg-orange-100 text-orange-700', permissions: ['tables.view', 'tables.open', 'tables.add_items', 'tables.pay', 'tables.add_notes'] },
+  kitchen: { label: 'Cocina', color: 'bg-red-100 text-red-700', permissions: ['kitchen.view', 'kitchen.update_status'] },
+  reports: { label: 'Reportes', color: 'bg-cyan-100 text-cyan-700', permissions: ['reports.view', 'reports.export'] },
+  users: { label: 'Usuarios', color: 'bg-gray-100 text-gray-700', permissions: ['users.view', 'users.manage'] },
+  settings: { label: 'Configuraci\u00f3n', color: 'bg-slate-100 text-slate-700', permissions: ['settings.view', 'settings.edit'] },
+}
+
+const ROLE_MODULE_ACCESS: Record<string, string[]> = {
+  ADMIN: Object.keys(MODULE_PERMISSIONS),
+  CAJERO: ['pos', 'products', 'categories', 'customers', 'invoices', 'tables'],
+  SUPERVISOR: ['pos', 'products', 'categories', 'inventory', 'invoices', 'customers', 'tables', 'kitchen', 'reports'],
+  MESERO: ['tables', 'products', 'categories', 'customers'],
+  COCINERO: ['kitchen'],
+  INVENTARIO: ['products', 'categories', 'inventory'],
+  REPORTES: ['reports', 'invoices'],
+}
 
 interface UserFormData {
   username: string
@@ -157,6 +181,15 @@ const UsersPage = () => {
           roleId: data.roleId,
           isActive: data.isActive
         })
+
+        if (data.password && data.password.length > 0) {
+          if (data.password.length < 6) {
+            toast.error('La contraseña debe tener al menos 6 caracteres')
+            setSaving(false)
+            return
+          }
+          await userService.changePassword(selectedUser.id, data.password)
+        }
         toast.success('Usuario actualizado')
       } else {
         await userService.create(data as CreateUserRequest)
@@ -272,7 +305,7 @@ const UsersPage = () => {
       {/* User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+          <div className="modal-content p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-800">
                 {selectedUser ? 'Editar Usuario' : 'Nuevo Usuario'}
@@ -306,7 +339,15 @@ const UsersPage = () => {
                 required
               />
 
-              {!selectedUser && (
+              {selectedUser ? (
+                <Input
+                  label="Contraseña (opcional)"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Dejar vacío para no cambiar"
+                />
+              ) : (
                 <Input
                   label="Contraseña *"
                   type="password"
@@ -317,18 +358,59 @@ const UsersPage = () => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
-                <select
-                  value={formData.roleId}
-                  onChange={(e) => setFormData({ ...formData, roleId: Number(e.target.value) })}
-                  className="input-field"
-                  required
-                >
-                  <option value="">Seleccionar...</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rol *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {roles.map((role) => {
+                    const isSelected = formData.roleId === role.id
+                    const modules = ROLE_MODULE_ACCESS[role.name] || []
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, roleId: role.id })}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          isSelected
+                            ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Shield size={14} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
+                          <span className={`text-sm font-semibold ${isSelected ? 'text-primary-700' : 'text-gray-700'}`}>{role.name}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {modules.slice(0, 4).map(mod => (
+                            <span key={mod} className={`text-[10px] px-1.5 py-0.5 rounded ${MODULE_PERMISSIONS[mod]?.color || 'bg-gray-100 text-gray-600'}`}>
+                              {MODULE_PERMISSIONS[mod]?.label || mod}
+                            </span>
+                          ))}
+                          {modules.length > 4 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">+{modules.length - 4}</span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                {formData.roleId && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+                      <Shield size={12} /> Acceso por m\u00f3dulo del rol seleccionado:
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {Object.entries(MODULE_PERMISSIONS).map(([key, mod]) => {
+                        const selectedRole = roles.find(r => r.id === formData.roleId)
+                        const hasAccess = selectedRole ? (ROLE_MODULE_ACCESS[selectedRole.name] || []).includes(key) : false
+                        return (
+                          <div key={key} className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${hasAccess ? 'text-green-700 bg-green-50' : 'text-gray-400 bg-gray-100'}`}>
+                            {hasAccess ? <Check size={10} /> : <Lock size={10} />}
+                            {mod.label}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2">

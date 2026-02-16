@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import Button from '@/shared/components/ui/Button'
 import { invoiceService } from '@/core/api/invoiceService'
 import { Invoice } from '@/types'
+import { printInvoice } from '@/shared/utils/printInvoice'
 
 const InvoicesPage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -322,66 +323,7 @@ const InvoicesPage = () => {
               <Button 
                 variant="primary" 
                 className="flex-1"
-                onClick={() => {
-                  const _settings = JSON.parse(localStorage.getItem('pos_settings') || '{}')
-                  const companyName = _settings?.company?.companyName || 'Mi Empresa'
-                  const inv = selectedInvoice as any
-                  const printWindow = window.open('', '_blank')
-                  if (printWindow) {
-                      printWindow.document.write(`
-                        <html>
-                          <head>
-                            <title>Factura ${inv.invoiceNumber}</title>
-                            <style>
-                              body { font-family: 'Courier New', monospace; padding: 10px; max-width: 300px; margin: 0 auto; font-size: 12px; }
-                              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-                              .header h1 { margin: 0 0 2px; font-size: 16px; text-transform: uppercase; }
-                              .header .invoice-num { font-size: 13px; font-weight: bold; }
-                              .header p { margin: 2px 0; font-size: 11px; }
-                              .info { margin-bottom: 8px; }
-                              .info div { margin: 2px 0; }
-                              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 6px 0; }
-                              .item { display: flex; justify-content: space-between; margin: 3px 0; }
-                              .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
-                              .total-final { font-size: 15px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
-                              .payment-info { border-top: 1px dashed #000; margin-top: 8px; padding-top: 6px; }
-                              .footer { text-align: center; margin-top: 15px; font-size: 10px; color: #666; border-top: 1px dashed #000; padding-top: 8px; }
-                            </style>
-                          </head>
-                          <body>
-                            <div class="header">
-                              <h1>${companyName}</h1>
-                              <div class="invoice-num">N° ${inv.invoiceNumber}</div>
-                              <p>${formatDate(inv.createdAt)}</p>
-                            </div>
-                            <div class="info">
-                              <div>Cliente: ${inv.customer?.fullName || inv.customerName || 'Cliente General'}</div>
-                              <div>Cajero: ${inv.userName || '-'}</div>
-                            </div>
-                            <div class="items">
-                              ${(inv.details || []).map((d: any) => `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`).join('')}
-                            </div>
-                            <div class="totals">
-                              <div><span>Subtotal:</span><span>${formatCurrency(inv.subtotal)}</span></div>
-                              ${inv.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
-                              ${inv.serviceChargeAmount > 0 ? `<div><span>Servicio (${inv.serviceChargePercent}%):</span><span>${formatCurrency(inv.serviceChargeAmount)}</span></div>` : ''}
-                              <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(inv.total)}</span></div>
-                            </div>
-                            <div class="payment-info">
-                              <div><span>Método:</span><span>${getPaymentMethodLabel(inv.paymentMethod)}</span></div>
-                              ${inv.amountReceived > 0 ? `<div><span>Recibido:</span><span>${formatCurrency(inv.amountReceived)}</span></div>` : ''}
-                              ${inv.changeAmount > 0 ? `<div style="font-weight:bold;"><span>Cambio:</span><span>${formatCurrency(inv.changeAmount)}</span></div>` : ''}
-                            </div>
-                            <div class="footer">
-                              <p>¡Gracias por su compra!</p>
-                            </div>
-                          </body>
-                        </html>
-                      `)
-                      printWindow.document.close()
-                    printWindow.print()
-                  }
-                }}
+                onClick={() => printInvoice(selectedInvoice as any)}
               >
                 <Printer size={20} />
                 Imprimir
@@ -397,7 +339,7 @@ const InvoicesPage = () => {
       {/* Void Modal */}
       {showVoidModal && selectedInvoice && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+          <div className="modal-content p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-gray-800">Anular Factura</h3>
               <button onClick={() => setShowVoidModal(false)} className="text-gray-400 hover:text-gray-600">

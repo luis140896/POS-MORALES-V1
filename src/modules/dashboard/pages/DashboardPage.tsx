@@ -9,21 +9,13 @@ import {
   ArrowDownRight,
   AlertTriangle,
   Loader2,
-  Calendar
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { invoiceService } from '@/core/api/invoiceService'
 import { inventoryService } from '@/core/api/inventoryService'
 import { dashboardService } from '@/core/api/reportService'
 import { Inventory } from '@/types'
-
-// Helper: local date as YYYY-MM-DD (avoids UTC shift from toISOString)
-const toLocalDateStr = (d: Date) => {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+import DateRangeFilter, { toLocalDateStr } from '@/shared/components/DateRangeFilter'
 
 interface DailySale {
   date: string
@@ -198,78 +190,8 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Date Filter */}
-      <div className="card">
-        <div className="flex flex-wrap gap-3 sm:gap-4 items-center">
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Calendar size={20} className="text-gray-400 hidden sm:block" />
-            <input
-              type="date"
-              className="input-field flex-1 sm:flex-none"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-            />
-            <span className="text-gray-400">a</span>
-            <input
-              type="date"
-              className="input-field flex-1 sm:flex-none"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                const d = toLocalDateStr(new Date())
-                setDateRange({ start: d, end: d })
-              }}
-              className="btn-ghost text-sm"
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => {
-                const end = new Date()
-                const start = new Date()
-                start.setDate(start.getDate() - 7)
-                setDateRange({
-                  start: toLocalDateStr(start),
-                  end: toLocalDateStr(end),
-                })
-              }}
-              className="btn-ghost text-sm"
-            >
-              Semana
-            </button>
-            <button
-              onClick={() => {
-                const now = new Date()
-                const start = new Date(now.getFullYear(), now.getMonth(), 1)
-                setDateRange({
-                  start: toLocalDateStr(start),
-                  end: toLocalDateStr(new Date()),
-                })
-              }}
-              className="btn-ghost text-sm"
-            >
-              Mes
-            </button>
-            <button
-              onClick={() => {
-                const now = new Date()
-                const start = new Date(now.getFullYear(), 0, 1)
-                setDateRange({
-                  start: toLocalDateStr(start),
-                  end: toLocalDateStr(new Date()),
-                })
-              }}
-              className="btn-ghost text-sm"
-            >
-              Año
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Date Filter - compact inline */}
+      <DateRangeFilter dateRange={dateRange} setDateRange={setDateRange} />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
@@ -293,40 +215,31 @@ const DashboardPage = () => {
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Acciones Rápidas</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => navigate('/pos')} className="btn-secondary text-sm">Nueva Venta</button>
-            <button onClick={() => navigate('/products')} className="btn-secondary text-sm">Agregar Producto</button>
-            <button onClick={() => navigate('/reports')} className="btn-secondary text-sm">Ver Reportes</button>
-            <button onClick={() => navigate('/inventory')} className="btn-secondary text-sm">Inventario</button>
-          </div>
+      {/* Alerts + Quick Actions - compact row */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {outOfStock.length > 0 && (
+            <button onClick={() => navigate('/inventory')} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors border border-red-200">
+              <AlertTriangle size={13} />
+              {outOfStock.length} sin stock
+            </button>
+          )}
+          {lowStock.length > 0 && (
+            <button onClick={() => navigate('/inventory')} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200">
+              <AlertTriangle size={13} />
+              {lowStock.length} stock bajo
+            </button>
+          )}
+          {lowStock.length === 0 && outOfStock.length === 0 && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium border border-green-200">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" /> Sin alertas
+            </span>
+          )}
         </div>
-        
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Alertas</h3>
-          <div className="space-y-3">
-            {lowStock.length > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/inventory')}>
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                <span className="text-sm text-amber-700">{lowStock.length} producto(s) con stock bajo</span>
-              </div>
-            )}
-            {outOfStock.length > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-xl cursor-pointer hover:bg-red-100 transition-colors" onClick={() => navigate('/inventory')}>
-                <AlertTriangle className="w-4 h-4 text-red-500" />
-                <span className="text-sm text-red-700">{outOfStock.length} producto(s) sin stock</span>
-              </div>
-            )}
-            {lowStock.length === 0 && outOfStock.length === 0 && (
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-green-700">Todo en orden, sin alertas</span>
-              </div>
-            )}
-          </div>
+        <div className="flex gap-2 ml-auto">
+          <button onClick={() => navigate('/pos')} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors">Nueva Venta</button>
+          <button onClick={() => navigate('/reports')} className="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors border border-gray-200">Reportes</button>
+          <button onClick={() => navigate('/inventory')} className="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors border border-gray-200">Inventario</button>
         </div>
       </div>
 

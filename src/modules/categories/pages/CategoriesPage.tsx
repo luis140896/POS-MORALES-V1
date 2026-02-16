@@ -62,6 +62,16 @@ const CategoriesPage = () => {
     fetchCategories()
   }, [])
 
+  const handleToggleActive = async (category: Category) => {
+    try {
+      await categoryService.update(category.id, { isActive: !category.isActive })
+      toast.success(`Categoría ${!category.isActive ? 'activada' : 'desactivada'}`)
+      fetchCategories()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al actualizar estado')
+    }
+  }
+
   const fetchCategories = async () => {
     try {
       setLoading(true)
@@ -77,6 +87,7 @@ const CategoriesPage = () => {
           } catch {
             return { ...cat, productCount: cat.productCount ?? 0 }
           }
+
         })
       )
 
@@ -214,9 +225,13 @@ const CategoriesPage = () => {
                   <Package size={12} />
                   <span>{category.productCount || 0}</span>
                 </button>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${category.isActive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                <button
+                  onClick={() => handleToggleActive(category)}
+                  className={`text-xs px-2 py-0.5 rounded-full transition-colors ${category.isActive ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                  title="Cambiar estado"
+                >
                   {category.isActive ? 'Activa' : 'Inactiva'}
-                </span>
+                </button>
               </div>
             </div>
           ))}
@@ -301,7 +316,7 @@ const CategoriesPage = () => {
       {/* Category Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-scale-in">
+          <div className="modal-content p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-800">
                 {selectedCategory ? 'Editar Categoría' : 'Nueva Categoría'}
@@ -369,6 +384,17 @@ const CategoriesPage = () => {
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="categoryIsActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label htmlFor="categoryIsActive" className="text-sm text-gray-700">Categoría activa</label>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
