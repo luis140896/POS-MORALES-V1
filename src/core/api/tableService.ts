@@ -30,6 +30,7 @@ export interface AddTableItemsRequest {
     quantity: number
     unitPrice: number
     discountAmount?: number
+    notes?: string
   }[]
 }
 

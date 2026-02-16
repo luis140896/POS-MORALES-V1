@@ -7,6 +7,7 @@ export interface CartItem {
   price: number
   quantity: number
   imageUrl?: string
+  notes?: string
 }
 
 interface CartState {
@@ -71,6 +72,12 @@ const cartSlice = createSlice({
     setNotes: (state, action: PayloadAction<string>) => {
       state.notes = action.payload
     },
+    updateItemNotes: (state, action: PayloadAction<{ id: number; notes: string }>) => {
+      const item = state.items.find((item) => item.id === action.payload.id)
+      if (item) {
+        item.notes = action.payload.notes
+      }
+    },
     clearCart: (state) => {
       state.items = []
       state.customerId = null
@@ -91,6 +98,7 @@ export const {
   setCustomer,
   setDiscount,
   setNotes,
+  updateItemNotes,
   clearCart,
 } = cartSlice.actions
 

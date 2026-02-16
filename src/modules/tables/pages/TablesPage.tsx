@@ -66,7 +66,7 @@ const TablesPage = () => {
   // Add items
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
-  const [itemsToAdd, setItemsToAdd] = useState<{ product: Product; quantity: number }[]>([])
+  const [itemsToAdd, setItemsToAdd] = useState<{ product: Product; quantity: number; notes?: string }[]>([])
 
   // Pay form
   const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO')
@@ -220,6 +220,7 @@ const TablesPage = () => {
           productId: i.product.id,
           quantity: i.quantity,
           unitPrice: i.product.salePrice,
+          notes: i.notes || undefined,
         }))
       }
       const res = await tableService.addItems(selectedTable.id, request)
@@ -657,6 +658,9 @@ const TablesPage = () => {
                               <p className="text-xs text-gray-500">
                                 {detail.quantity} x {formatCurrency(detail.unitPrice)}
                               </p>
+                              {detail.notes && (
+                                <p className="text-xs font-medium text-red-600 mt-0.5">⚠️ {detail.notes}</p>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-semibold text-gray-700">
@@ -945,11 +949,12 @@ const TablesPage = () => {
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1.5">
                   {itemsToAdd.map(item => (
-                    <div key={item.product.id} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.product.name}</p>
-                        <p className="text-xs text-gray-500">{formatCurrency(item.product.salePrice * item.quantity)}</p>
-                      </div>
+                    <div key={item.product.id} className="p-2.5 bg-gray-50 rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.product.name}</p>
+                          <p className="text-xs text-gray-500">{formatCurrency(item.product.salePrice * item.quantity)}</p>
+                        </div>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => updateItemQuantity(item.product.id, -1)}
@@ -971,6 +976,14 @@ const TablesPage = () => {
                           <X size={14} />
                         </button>
                       </div>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Ej: sin cebolla, salsa extra..."
+                        value={item.notes || ''}
+                        onChange={(e) => setItemsToAdd(prev => prev.map(i => i.product.id === item.product.id ? { ...i, notes: e.target.value } : i))}
+                        className="w-full text-xs px-2 py-1 border border-gray-200 rounded-lg focus:border-primary-400 focus:ring-1 focus:ring-primary-200 placeholder-gray-300"
+                      />
                     </div>
                   ))}
                   {itemsToAdd.length === 0 && (

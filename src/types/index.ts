@@ -114,6 +114,8 @@ export interface InvoiceDetail {
   discountAmount: number
   taxAmount: number
   subtotal: number
+  notes?: string
+  kitchenStatus?: string
   createdAt: string
 }
 

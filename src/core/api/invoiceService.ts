@@ -6,6 +6,7 @@ export interface SaleDetailRequest {
   quantity: number
   unitPrice: number
   discountAmount?: number
+  notes?: string
 }
 
 export interface CreateSaleRequest {

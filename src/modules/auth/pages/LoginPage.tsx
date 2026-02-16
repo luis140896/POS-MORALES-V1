@@ -88,14 +88,7 @@ const LoginPage = () => {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-primary-100 text-center">
-            <p className="text-sm text-gray-500">
-              Usuario por defecto: <span className="font-medium text-primary-600">admin</span>
-            </p>
-            <p className="text-sm text-gray-500">
-              Contraseña: <span className="font-medium text-primary-600">admin123</span>
-            </p>
-          </div>
+          
         </div>
       </div>
     </div>

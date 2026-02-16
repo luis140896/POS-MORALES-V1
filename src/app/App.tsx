@@ -16,6 +16,7 @@ import ReportsPage from '@/modules/reports/pages/ReportsPage'
 import UsersPage from '@/modules/users/pages/UsersPage'
 import SettingsPage from '@/modules/settings/pages/SettingsPage'
 import TablesPage from '@/modules/tables/pages/TablesPage'
+import KitchenPage from '@/modules/kitchen/pages/KitchenPage'
 import ProtectedRoute from '@/core/auth/ProtectedRoute'
 import RoleGuard from '@/core/auth/RoleGuard'
 
@@ -172,6 +173,14 @@ function App() {
             element={
               <RoleGuard allowedRoles={['ADMIN']}>
                 <UsersPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/kitchen"
+            element={
+              <RoleGuard allowedRoles={['ADMIN', 'COCINERO', 'SUPERVISOR', 'CAJERO']}>
+                <KitchenPage />
               </RoleGuard>
             }
           />

@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Store,
   UtensilsCrossed,
+  ChefHat,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -27,6 +28,7 @@ const menuItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/pos', icon: ShoppingCart, label: 'Punto de Venta', allowedRoles: ['ADMIN', 'CAJERO', 'SUPERVISOR'] },
   { path: '/tables', icon: UtensilsCrossed, label: 'Mesas', allowedRoles: ['ADMIN', 'CAJERO', 'SUPERVISOR', 'MESERO'] },
+  { path: '/kitchen', icon: ChefHat, label: 'Cocina', allowedRoles: ['ADMIN', 'COCINERO', 'SUPERVISOR', 'CAJERO'] },
   { path: '/products', icon: Package, label: 'Productos', allowedRoles: ['ADMIN', 'INVENTARIO'] },
   { path: '/categories', icon: FolderTree, label: 'Categorías', allowedRoles: ['ADMIN', 'INVENTARIO'] },
   { path: '/inventory', icon: Warehouse, label: 'Inventario', allowedRoles: ['ADMIN', 'INVENTARIO'] },

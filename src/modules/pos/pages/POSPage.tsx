@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, Loader2, User, UserPlus, Printer, Grid3X3, LayoutGrid, Grid2X2, UtensilsCrossed, ShoppingCart } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
-import { addItem, removeItem, incrementQuantity, decrementQuantity, clearCart, setCustomer, selectCartTotal } from '../store/cartSlice'
+import { addItem, removeItem, incrementQuantity, decrementQuantity, clearCart, setCustomer, selectCartTotal, updateItemNotes } from '../store/cartSlice'
 import Button from '@/shared/components/ui/Button'
 import { productService } from '@/core/api/productService'
 import { categoryService } from '@/core/api/categoryService'
@@ -779,6 +779,7 @@ const POSPage = () => {
           productId: item.id,
           quantity: item.quantity,
           unitPrice: item.price,
+          notes: item.notes || undefined,
         }))
       }
 
@@ -821,6 +822,7 @@ const POSPage = () => {
             productId: item.id,
             quantity: item.quantity,
             unitPrice: item.price,
+            notes: item.notes || undefined,
           }))
         })
 
@@ -853,7 +855,8 @@ const POSPage = () => {
             productId: item.id,
             quantity: item.quantity,
             unitPrice: item.price,
-            discountAmount: 0
+            discountAmount: 0,
+            notes: item.notes || undefined
           }))
         }
 
@@ -1171,6 +1174,13 @@ const POSPage = () => {
                     <p className="font-medium text-gray-800 text-sm">{item.name}</p>
                     <p className="text-primary-600 font-semibold">{formatCurrency(item.price)}</p>
                     <p className="text-xs text-gray-400">Stock: {maxStock}</p>
+                    <input
+                      type="text"
+                      placeholder="Ej: sin cebolla, salsa extra..."
+                      value={item.notes || ''}
+                      onChange={(e) => dispatch(updateItemNotes({ id: item.id, notes: e.target.value }))}
+                      className="mt-1 w-full text-xs px-2 py-1 border border-gray-200 rounded-lg focus:border-primary-400 focus:ring-1 focus:ring-primary-200 placeholder-gray-300"
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     <button
