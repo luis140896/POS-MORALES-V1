@@ -32,6 +32,7 @@ interface PrintableInvoice {
   details?: Array<{ quantity: number; productName: string; subtotal: number; notes?: string }>
   subtotal: number
   discountAmount: number
+  discountPercent?: number
   serviceChargeAmount?: number
   serviceChargePercent?: number
   deliveryChargeAmount?: number
@@ -130,9 +131,9 @@ export function printInvoice(inv: PrintableInvoice, options: PrintOptions = {}) 
   </div>
   <div class="totals">
     <div><span>Subtotal:</span><span>${formatCurrency(inv.subtotal)}</span></div>
-    ${inv.discountAmount > 0 ? `<div><span>Descuento:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
-    ${(inv.serviceChargeAmount || 0) > 0 ? `<div><span>Servicio (${inv.serviceChargePercent || 10}%):</span><span>${formatCurrency(inv.serviceChargeAmount!)}</span></div>` : ''}
-    ${(inv.deliveryChargeAmount || 0) > 0 ? `<div><span>Domicilio:</span><span>${formatCurrency(inv.deliveryChargeAmount!)}</span></div>` : ''}
+    ${inv.discountAmount > 0 ? `<div><span>Descuento${inv.discountPercent ? ` (${inv.discountPercent}%)` : ''}:</span><span>-${formatCurrency(inv.discountAmount)}</span></div>` : ''}
+    ${(inv.serviceChargeAmount || 0) > 0 ? `<div><span>Cargo Servicio (${inv.serviceChargePercent || 10}%):</span><span>+${formatCurrency(inv.serviceChargeAmount!)}</span></div>` : ''}
+    ${(inv.deliveryChargeAmount || 0) > 0 ? `<div><span>Cargo Domicilio:</span><span>+${formatCurrency(inv.deliveryChargeAmount!)}</span></div>` : ''}
     <div class="total-final"><span>TOTAL:</span><span>${formatCurrency(inv.total)}</span></div>
   </div>
   ${!isPreBill && inv.paymentMethod ? `

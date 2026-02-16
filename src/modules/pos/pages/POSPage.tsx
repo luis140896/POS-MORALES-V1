@@ -10,6 +10,7 @@ import { categoryService } from '@/core/api/categoryService'
 import { customerService } from '@/core/api/customerService'
 import { invoiceService } from '@/core/api/invoiceService'
 import { tableService } from '@/core/api/tableService'
+import { promotionService, Promotion } from '@/core/api/promotionService'
 import { Product, Category, Customer, RestaurantTable } from '@/types'
 import { printInvoice } from '@/shared/utils/printInvoice'
 
@@ -449,6 +450,10 @@ interface PaymentModalProps {
   setIncludeServiceCharge: (value: boolean) => void
   includeDelivery: boolean
   setIncludeDelivery: (value: boolean) => void
+  deliveryCharge: number
+  setDeliveryCharge: (value: number) => void
+  totalDiscountPercent: number
+  setTotalDiscountPercent: (value: number) => void
   amountReceived: string
   setAmountReceived: (value: string) => void
   processing: boolean
@@ -460,8 +465,6 @@ interface PaymentModalProps {
   customerName: string
 }
 
-const DELIVERY_CHARGE = 3000
-
 const PaymentModal = ({
   show,
   paymentMethod,
@@ -472,6 +475,10 @@ const PaymentModal = ({
   setIncludeServiceCharge,
   includeDelivery,
   setIncludeDelivery,
+  deliveryCharge,
+  setDeliveryCharge,
+  totalDiscountPercent,
+  setTotalDiscountPercent,
   amountReceived,
   setAmountReceived,
   processing,
@@ -485,13 +492,15 @@ const PaymentModal = ({
   if (!show) return null
 
   const serviceChargeAmount = includeServiceCharge ? total * 0.10 : 0
-  const deliveryAmount = includeDelivery ? DELIVERY_CHARGE : 0
-  const finalTotal = total + serviceChargeAmount + deliveryAmount
+  const deliveryAmount = includeDelivery ? deliveryCharge : 0
+  const totalDiscountAmount = (total * totalDiscountPercent) / 100
+  const finalTotal = total + serviceChargeAmount + deliveryAmount - totalDiscountAmount
 
-  const recalcAmount = (svc: boolean, dlv: boolean) => {
+  const recalcAmount = (svc: boolean, dlv: boolean, dlvCharge: number, discPercent: number) => {
     const svcAmt = svc ? total * 0.10 : 0
-    const dlvAmt = dlv ? DELIVERY_CHARGE : 0
-    setAmountReceived((total + svcAmt + dlvAmt).toFixed(0))
+    const dlvAmt = dlv ? dlvCharge : 0
+    const discAmt = (total * discPercent) / 100
+    setAmountReceived((total + svcAmt + dlvAmt - discAmt).toFixed(0))
   }
 
   return (
@@ -532,7 +541,7 @@ const PaymentModal = ({
                   checked={includeServiceCharge}
                   onChange={(e) => {
                     setIncludeServiceCharge(e.target.checked)
-                    recalcAmount(e.target.checked, includeDelivery)
+                    recalcAmount(e.target.checked, includeDelivery, deliveryCharge, totalDiscountPercent)
                   }}
                   className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
@@ -543,23 +552,68 @@ const PaymentModal = ({
               </span>
             </div>
 
-            {/* Delivery charge toggle */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
+            {/* Delivery charge toggle with editable amount */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeDelivery}
+                    onChange={(e) => {
+                      setIncludeDelivery(e.target.checked)
+                      recalcAmount(includeServiceCharge, e.target.checked, deliveryCharge, totalDiscountPercent)
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Domicilio</span>
+                </label>
+                <span className={`text-sm font-medium ${includeDelivery ? 'text-amber-600' : 'text-gray-400'}`}>
+                  {includeDelivery ? formatCurrency(deliveryAmount) : '$0'}
+                </span>
+              </div>
+              {includeDelivery && (
+                <div className="ml-6">
+                  <input
+                    type="number"
+                    value={deliveryCharge}
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value) || 0)
+                      setDeliveryCharge(val)
+                      recalcAmount(includeServiceCharge, includeDelivery, val, totalDiscountPercent)
+                    }}
+                    className="w-full text-sm px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    min="0"
+                    step="500"
+                    placeholder="Valor domicilio"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Total discount percent */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Descuento adicional (%)</span>
+                <span className={`text-sm font-medium ${totalDiscountPercent > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                  {totalDiscountPercent > 0 ? `-${formatCurrency(totalDiscountAmount)}` : '$0'}
+                </span>
+              </div>
+              <div>
                 <input
-                  type="checkbox"
-                  checked={includeDelivery}
+                  type="number"
+                  value={totalDiscountPercent}
                   onChange={(e) => {
-                    setIncludeDelivery(e.target.checked)
-                    recalcAmount(includeServiceCharge, e.target.checked)
+                    const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+                    setTotalDiscountPercent(val)
+                    recalcAmount(includeServiceCharge, includeDelivery, deliveryCharge, val)
                   }}
-                  className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  className="w-full text-sm px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  min="0"
+                  max="100"
+                  step="5"
+                  placeholder="% descuento"
                 />
-                <span className="text-sm font-medium text-gray-700">Domicilio</span>
-              </label>
-              <span className={`text-sm font-medium ${includeDelivery ? 'text-amber-600' : 'text-gray-400'}`}>
-                {includeDelivery ? formatCurrency(DELIVERY_CHARGE) : '$0'}
-              </span>
+              </div>
             </div>
           </div>
 
@@ -655,6 +709,9 @@ const POSPage = () => {
   const [showInvoiceConfirmModal, setShowInvoiceConfirmModal] = useState(false)
   const [includeServiceCharge, setIncludeServiceCharge] = useState(false)
   const [includeDelivery, setIncludeDelivery] = useState(false)
+  const [deliveryCharge, setDeliveryCharge] = useState(3000)
+  const [totalDiscountPercent, setTotalDiscountPercent] = useState(0)
+  const [activePromotion, setActivePromotion] = useState<Promotion | null>(null)
 
   // Table selection for POS
   const [tables, setTables] = useState<RestaurantTable[]>([])
@@ -676,7 +733,23 @@ const POSPage = () => {
   useEffect(() => {
     fetchData()
     fetchTables()
+    fetchActivePromotion()
   }, [])
+
+  const fetchActivePromotion = async () => {
+    try {
+      const res = await promotionService.getToday()
+      if (res) {
+        setActivePromotion(res as Promotion)
+        // Sugerir aplicar promoción automáticamente si no hay descuento manual
+        if (totalDiscountPercent === 0) {
+          setTotalDiscountPercent((res as Promotion).discountPercent)
+        }
+      }
+    } catch {
+      // No promotion active today
+    }
+  }
 
   const normalizeProduct = (p: any): ProductWithCategory => {
     const categoryId = p?.category?.id ?? p?.categoryId ?? 0
@@ -937,8 +1010,9 @@ const POSPage = () => {
         const result = await tableService.payTable(selectedTableId, {
           paymentMethod: paymentMethod,
           amountReceived: parseFloat(amountReceived),
-          discountPercent: discountType === 'percent' ? discount : 0,
+          discountPercent: (discountType === 'percent' ? discount : 0) + totalDiscountPercent,
           serviceChargePercent: includeServiceCharge ? 10 : 0,
+          deliveryChargeAmount: includeDelivery ? deliveryCharge : 0,
           notes: notes || undefined,
         })
 
@@ -955,9 +1029,9 @@ const POSPage = () => {
         const saleRequest = {
           customerId: customerId,
           paymentMethod: paymentMethod,
-          discountPercent: discountType === 'percent' ? discount : 0,
+          discountPercent: (discountType === 'percent' ? discount : 0) + totalDiscountPercent,
           serviceChargePercent: includeServiceCharge ? 10 : 0,
-          deliveryChargeAmount: includeDelivery ? 3000 : 0,
+          deliveryChargeAmount: includeDelivery ? deliveryCharge : 0,
           amountReceived: parseFloat(amountReceived),
           notes: notes,
           details: items.map(item => ({
@@ -1002,8 +1076,11 @@ const POSPage = () => {
 
   const handlePrintPreBill = () => {
     const serviceChargeAmount = includeServiceCharge ? total * 0.10 : 0
-    const deliveryAmount = includeDelivery ? 3000 : 0
-    const finalTotal = total + serviceChargeAmount + deliveryAmount
+    const deliveryAmount = includeDelivery ? deliveryCharge : 0
+    const totalDiscountAmount = (total * totalDiscountPercent) / 100
+    const finalTotal = total + serviceChargeAmount + deliveryAmount - totalDiscountAmount
+    const combinedDiscountPercent = (discountType === 'percent' ? discount : 0) + totalDiscountPercent
+    
     printInvoice({
       invoiceNumber: 'PRE-CUENTA',
       createdAt: new Date().toISOString(),
@@ -1015,7 +1092,8 @@ const POSPage = () => {
         notes: item.notes,
       })),
       subtotal,
-      discountAmount,
+      discountAmount: discountAmount + totalDiscountAmount,
+      discountPercent: combinedDiscountPercent > 0 ? combinedDiscountPercent : undefined,
       serviceChargeAmount: serviceChargeAmount,
       serviceChargePercent: includeServiceCharge ? 10 : 0,
       deliveryChargeAmount: deliveryAmount,
@@ -1155,26 +1233,20 @@ const POSPage = () => {
         lg:w-96 flex-shrink-0 bg-white lg:rounded-2xl shadow-soft flex flex-col min-w-0
         transition-transform duration-300
       `}>
-        {/* Header */}
+        {/* Cart Header */}
         <div className="p-4 border-b border-primary-100">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold text-gray-800">Carrito</h2>
-            <div className="flex items-center gap-2">
-              {items.length > 0 && (
-                <button
-                  onClick={() => dispatch(clearCart())}
-                  className="text-red-500 hover:text-red-600 text-sm"
-                >
-                  Limpiar
-                </button>
-              )}
-              <button
-                onClick={() => setShowMobileCart(false)}
-                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 touch-target"
-              >
-                <X size={18} />
-              </button>
-            </div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <ShoppingCart size={20} />
+              Carrito
+            </h2>
+            <button
+              onClick={() => setShowCustomerModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors"
+            >
+              <User size={16} />
+              <span className="max-w-[120px] truncate">{customerName}</span>
+            </button>
           </div>
           <button 
             onClick={() => setShowCustomerModal(true)}
@@ -1379,6 +1451,10 @@ const POSPage = () => {
         setIncludeServiceCharge={setIncludeServiceCharge}
         includeDelivery={includeDelivery}
         setIncludeDelivery={setIncludeDelivery}
+        deliveryCharge={deliveryCharge}
+        setDeliveryCharge={setDeliveryCharge}
+        totalDiscountPercent={totalDiscountPercent}
+        setTotalDiscountPercent={setTotalDiscountPercent}
         amountReceived={amountReceived}
         setAmountReceived={setAmountReceived}
         processing={processing}

@@ -89,6 +89,8 @@ const TablesPage = () => {
 
   // Delivery charge
   const [includeDelivery, setIncludeDelivery] = useState(false)
+  const [deliveryCharge, setDeliveryCharge] = useState(3000)
+  const [totalDiscountPercent, setTotalDiscountPercent] = useState(0)
 
   // Create/Edit table form
   const [newTableNumber, setNewTableNumber] = useState('')
@@ -315,10 +317,11 @@ const TablesPage = () => {
     try {
       const baseTotal = activeSession.total || 0
       const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
-      const deliveryAmount = includeDelivery ? 3000 : 0
+      const deliveryAmount = includeDelivery ? deliveryCharge : 0
       const request: PayTableRequest = {
         paymentMethod,
         amountReceived: parseFloat(amountReceived),
+        discountPercent: totalDiscountPercent,
         serviceChargePercent: includeServiceCharge ? 10 : 0,
         deliveryChargeAmount: deliveryAmount,
       }
@@ -335,6 +338,8 @@ const TablesPage = () => {
       setShowPayModal(false)
       setAmountReceived('')
       setIncludeDelivery(false)
+      setDeliveryCharge(3000)
+      setTotalDiscountPercent(0)
       setIncludeServiceCharge(false)
       setSelectedTable(null)
       setActiveSession(null)
@@ -1108,14 +1113,16 @@ const TablesPage = () => {
       {/* Pay Modal */}
       {showPayModal && activeSession && (() => {
         const baseTotal = activeSession.total || 0
+        const discountAmount = (baseTotal * totalDiscountPercent) / 100
         const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
-        const deliveryAmount = includeDelivery ? 3000 : 0
-        const finalTotal = baseTotal + svcAmount + deliveryAmount
+        const deliveryAmount = includeDelivery ? deliveryCharge : 0
+        const finalTotal = baseTotal - discountAmount + svcAmount + deliveryAmount
         const recalcAmount = () => {
           const newBase = activeSession.total || 0
+          const newDisc = (newBase * totalDiscountPercent) / 100
           const newSvc = includeServiceCharge ? newBase * 0.10 : 0
-          const newDel = includeDelivery ? 3000 : 0
-          return (newBase + newSvc + newDel).toFixed(0)
+          const newDel = includeDelivery ? deliveryCharge : 0
+          return (newBase - newDisc + newSvc + newDel).toFixed(0)
         }
         return (
         <div className="modal-overlay">
@@ -1128,6 +1135,29 @@ const TablesPage = () => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
                 <span>{formatCurrency(baseTotal)}</span>
+              </div>
+              {/* Descuento */}
+              <div className="border-t border-primary-100 pt-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Descuento adicional (%)</label>
+                <input
+                  type="number"
+                  value={totalDiscountPercent}
+                  onChange={(e) => {
+                    const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0))
+                    setTotalDiscountPercent(val)
+                    setAmountReceived(recalcAmount())
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                  min="0"
+                  max="100"
+                  step="1"
+                />
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 mt-1">
+                    <span>Descuento ({totalDiscountPercent}%)</span>
+                    <span>-{formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between py-1 border-t border-primary-100">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1148,16 +1178,14 @@ const TablesPage = () => {
                   {includeServiceCharge ? formatCurrency(svcAmount) : '$0'}
                 </span>
               </div>
-              <div className="flex items-center justify-between py-1 border-t border-primary-100">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="border-t border-primary-100 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
                   <input
                     type="checkbox"
                     checked={includeDelivery}
                     onChange={(e) => {
                       setIncludeDelivery(e.target.checked)
-                      const newDel = e.target.checked ? 3000 : 0
-                      const newTotal = baseTotal + svcAmount + newDel
-                      setAmountReceived(newTotal.toFixed(0))
+                      setAmountReceived(recalcAmount())
                     }}
                     className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
@@ -1165,9 +1193,25 @@ const TablesPage = () => {
                     <Truck size={14} /> Domicilio
                   </span>
                 </label>
-                <span className={`text-sm font-medium ${includeDelivery ? 'text-primary-600' : 'text-gray-400'}`}>
-                  {includeDelivery ? formatCurrency(3000) : '$0'}
-                </span>
+                {includeDelivery && (
+                  <input
+                    type="number"
+                    value={deliveryCharge}
+                    onChange={(e) => {
+                      setDeliveryCharge(parseFloat(e.target.value) || 0)
+                      setAmountReceived(recalcAmount())
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                    min="0"
+                    step="1000"
+                  />
+                )}
+                {includeDelivery && (
+                  <div className="flex justify-between text-sm text-primary-600 mt-1">
+                    <span>Cargo Domicilio</span>
+                    <span>+{formatCurrency(deliveryCharge)}</span>
+                  </div>
+                )}
               </div>
               <div className="flex justify-between text-lg font-bold text-primary-700 pt-1 border-t border-primary-100">
                 <span>Total a pagar</span>

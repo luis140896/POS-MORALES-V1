@@ -15,6 +15,7 @@ import CustomersPage from '@/modules/customers/pages/CustomersPage'
 import ReportsPage from '@/modules/reports/pages/ReportsPage'
 import UsersPage from '@/modules/users/pages/UsersPage'
 import RolesPage from '@/modules/roles/pages/RolesPage'
+import PromotionsPage from '@/modules/promotions/pages/PromotionsPage'
 import SettingsPage from '@/modules/settings/pages/SettingsPage'
 import TablesPage from '@/modules/tables/pages/TablesPage'
 import KitchenPage from '@/modules/kitchen/pages/KitchenPage'
@@ -182,6 +183,14 @@ function App() {
             element={
               <RoleGuard requiredPermissions={['users.manage']}>
                 <RolesPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/promotions"
+            element={
+              <RoleGuard requiredPermissions={['promotions.manage']}>
+                <PromotionsPage />
               </RoleGuard>
             }
           />

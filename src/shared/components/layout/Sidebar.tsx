@@ -16,6 +16,7 @@ import {
   Store,
   UtensilsCrossed,
   ChefHat,
+  Tag,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -36,6 +37,7 @@ const menuItems = [
   { path: '/invoices', icon: FileText, label: 'Facturas', requiredPermissions: ['invoices.view'] },
   { path: '/customers', icon: Users, label: 'Clientes', requiredPermissions: ['customers.view'] },
   { path: '/reports', icon: BarChart3, label: 'Reportes', requiredPermissions: ['reports.view'] },
+  { path: '/promotions', icon: Tag, label: 'Promociones', requiredPermissions: ['promotions.manage'] },
   { path: '/users', icon: Users, label: 'Usuarios', requiredPermissions: ['users.manage'] },
   { path: '/roles', icon: Shield, label: 'Roles', requiredPermissions: ['users.manage'] },
   { path: '/settings', icon: Settings, label: 'Configuración', requiredPermissions: ['settings.view'] },
