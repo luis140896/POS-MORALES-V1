@@ -1,5 +1,6 @@
 import { useSelector, useDispatch } from 'react-redux'
-import { Save, Palette, Building2, Receipt, Check, RotateCcw, Upload, Trash2, Image, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Save, Palette, Building2, Receipt, Check, RotateCcw, Upload, Trash2, Image, Loader2, UtensilsCrossed } from 'lucide-react'
 import { useState, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { RootState, AppDispatch } from '@/app/store'
@@ -9,6 +10,7 @@ import Input from '@/shared/components/ui/Input'
 
 const SettingsPage = () => {
   const dispatch = useDispatch<AppDispatch>()
+  const navigate = useNavigate()
   const { theme, company, businessType } = useSelector((state: RootState) => state.settings)
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -289,6 +291,22 @@ const SettingsPage = () => {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Quick Access - Table Settings */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+              <UtensilsCrossed className="w-5 h-5 text-orange-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-800">Configuración de Mesas</h2>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Personaliza las zonas y estados de las mesas del restaurante
+          </p>
+          <Button variant="secondary" onClick={() => navigate('/settings/tables')} className="w-full">
+            Configurar Zonas y Estados
+          </Button>
         </div>
 
         {/* Logo Upload */}

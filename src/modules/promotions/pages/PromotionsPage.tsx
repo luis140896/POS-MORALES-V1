@@ -398,11 +398,11 @@ const PromotionsPage = () => {
                 <p className="text-xs text-gray-600 mt-2 ml-8">Las promociones inactivas no se aplicarán hasta que las actives manualmente</p>
               </div>
 
-              <div className="flex gap-3 pt-6 border-t border-gray-200">
-                <Button type="submit" variant="primary" className="flex-1" disabled={saving}>
+              <div className="flex gap-3 pt-6 border-t border-gray-200 mt-6">
+                <Button type="submit" variant="primary" className="flex-1 px-6 py-3" disabled={saving}>
                   {saving ? 'Guardando...' : selectedPromotion ? 'Actualizar' : 'Crear'}
                 </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowModal(false)} disabled={saving}>
+                <Button type="button" variant="secondary" className="px-6 py-3" onClick={() => setShowModal(false)} disabled={saving}>
                   Cancelar
                 </Button>
               </div>

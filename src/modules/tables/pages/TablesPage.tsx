@@ -15,11 +15,38 @@ import { RestaurantTable, TableSession, Product, Category, Customer, InvoiceDeta
 
 const DEFAULT_ZONES = ['INTERIOR', 'TERRAZA', 'BAR', 'VIP']
 
-const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
+const DEFAULT_STATUS_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
   DISPONIBLE: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', label: 'Disponible' },
   OCUPADA: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-300', label: 'Ocupada' },
   RESERVADA: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', label: 'Reservada' },
   FUERA_DE_SERVICIO: { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300', label: 'Fuera de servicio' },
+}
+
+const loadTableZones = (): string[] => {
+  const saved = localStorage.getItem('table_zones')
+  if (saved) {
+    const zones = JSON.parse(saved)
+    return zones.map((z: any) => z.id)
+  }
+  return DEFAULT_ZONES
+}
+
+const loadStatusColors = (): Record<string, { bg: string; text: string; border: string; label: string }> => {
+  const saved = localStorage.getItem('table_statuses')
+  if (saved) {
+    const statuses = JSON.parse(saved)
+    const result: Record<string, { bg: string; text: string; border: string; label: string }> = {}
+    statuses.forEach((s: any) => {
+      result[s.id] = {
+        bg: s.bgColor,
+        text: s.textColor,
+        border: s.borderColor,
+        label: s.label
+      }
+    })
+    return result
+  }
+  return DEFAULT_STATUS_COLORS
 }
 
 const formatCurrency = (value: number) => {
@@ -44,6 +71,10 @@ const TablesPage = () => {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Dynamic configs
+  const [availableZones, setAvailableZones] = useState<string[]>(loadTableZones())
+  const [statusColors, setStatusColors] = useState(loadStatusColors())
 
   // Filters
   const [zoneFilter, setZoneFilter] = useState<string | null>(null)
@@ -461,7 +492,7 @@ const TablesPage = () => {
   // ==================== FILTERS ====================
 
   const allZones = Array.from(new Set([
-    ...DEFAULT_ZONES,
+    ...availableZones,
     ...tables.map(t => t.zone).filter(Boolean)
   ]))
 
@@ -552,7 +583,7 @@ const TablesPage = () => {
           >
             Todas
           </button>
-          {allZones.map(zone => (
+          {availableZones.map(zone => (
             <button
               key={zone}
               onClick={() => setZoneFilter(zone === zoneFilter ? null : zone)}
@@ -564,7 +595,7 @@ const TablesPage = () => {
             </button>
           ))}
           <div className="w-px bg-gray-200 mx-1" />
-          {Object.entries(STATUS_COLORS).map(([status, colors]) => (
+          {Object.entries(statusColors).map(([status, colors]) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status === statusFilter ? null : status)}
@@ -583,7 +614,7 @@ const TablesPage = () => {
         <div className="lg:flex-1 lg:overflow-y-auto">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {filteredTables.map(table => {
-              const colors = STATUS_COLORS[table.status] || STATUS_COLORS.DISPONIBLE
+              const colors = statusColors[table.status] || statusColors.DISPONIBLE || DEFAULT_STATUS_COLORS.DISPONIBLE
               const isSelected = selectedTable?.id === table.id
               const elapsed = table.activeSession ? getElapsedMinutes(table.activeSession.openedAt) : 0
 
@@ -655,7 +686,7 @@ const TablesPage = () => {
         {selectedTable ? (
           <>
             {/* Panel Header */}
-            <div className={`p-4 border-b ${STATUS_COLORS[selectedTable.status]?.bg || 'bg-gray-50'}`}>
+            <div className={`p-4 border-b ${statusColors[selectedTable.status]?.bg || 'bg-gray-50'}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-gray-800">
@@ -812,7 +843,7 @@ const TablesPage = () => {
                     } />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                    {STATUS_COLORS[selectedTable.status]?.label}
+                    {statusColors[selectedTable.status]?.label || selectedTable.status}
                   </h3>
                   {isAdmin && (
                     <button
@@ -1001,10 +1032,10 @@ const TablesPage = () => {
                       autoFocus
                     />
                   </div>
-                  <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1">
+                  <div className="grid grid-cols-3 gap-2 mt-3">
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         !selectedCategory ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -1014,7 +1045,7 @@ const TablesPage = () => {
                       <button
                         key={cat.id}
                         onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedCategory === cat.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >

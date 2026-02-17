@@ -10,10 +10,16 @@ interface UseSseEventsOptions {
   enabled?: boolean
 }
 
+const MIN_RECONNECT_DELAY = 1000 // 1 segundo
+const MAX_RECONNECT_DELAY = 30000 // 30 segundos
+const BACKOFF_MULTIPLIER = 2
+
 export const useSseEvents = (options: UseSseEventsOptions) => {
   const { onNewOrder, onKitchenUpdate, onOrderPaid, onConnected, enabled = true } = options
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectDelayRef = useRef<number>(MIN_RECONNECT_DELAY)
+  const reconnectAttemptsRef = useRef<number>(0)
 
   const connect = useCallback(() => {
     if (!enabled) return
@@ -29,6 +35,8 @@ export const useSseEvents = (options: UseSseEventsOptions) => {
     eventSourceRef.current = es
 
     es.addEventListener('connected', () => {
+      reconnectDelayRef.current = MIN_RECONNECT_DELAY
+      reconnectAttemptsRef.current = 0
       onConnected?.()
     })
 
@@ -56,10 +64,17 @@ export const useSseEvents = (options: UseSseEventsOptions) => {
     es.onerror = () => {
       es.close()
       eventSourceRef.current = null
-      // Reconectar después de 5 segundos
+      
+      reconnectAttemptsRef.current += 1
+      const delay = Math.min(
+        reconnectDelayRef.current * Math.pow(BACKOFF_MULTIPLIER, reconnectAttemptsRef.current - 1),
+        MAX_RECONNECT_DELAY
+      )
+      reconnectDelayRef.current = delay
+      
       reconnectTimeoutRef.current = setTimeout(() => {
         connect()
-      }, 5000)
+      }, delay)
     }
   }, [enabled, onNewOrder, onKitchenUpdate, onOrderPaid, onConnected])
 

@@ -17,6 +17,7 @@ import UsersPage from '@/modules/users/pages/UsersPage'
 import RolesPage from '@/modules/roles/pages/RolesPage'
 import PromotionsPage from '@/modules/promotions/pages/PromotionsPage'
 import SettingsPage from '@/modules/settings/pages/SettingsPage'
+import TableSettingsPage from '@/modules/settings/pages/TableSettingsPage'
 import TablesPage from '@/modules/tables/pages/TablesPage'
 import KitchenPage from '@/modules/kitchen/pages/KitchenPage'
 import ProtectedRoute from '@/core/auth/ProtectedRoute'
@@ -207,6 +208,14 @@ function App() {
             element={
               <RoleGuard requiredPermissions={['settings.view']}>
                 <SettingsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/settings/tables"
+            element={
+              <RoleGuard requiredPermissions={['settings.view']}>
+                <TableSettingsPage />
               </RoleGuard>
             }
           />

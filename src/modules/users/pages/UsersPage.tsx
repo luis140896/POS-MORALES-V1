@@ -9,21 +9,22 @@ import { User, Role } from '@/types'
 const MODULE_PERMISSIONS: Record<string, { label: string; color: string; permissions: string[] }> = {
   pos: { label: 'POS', color: 'bg-green-100 text-green-700', permissions: ['pos.sell', 'pos.discount', 'pos.void'] },
   products: { label: 'Productos', color: 'bg-blue-100 text-blue-700', permissions: ['products.view', 'products.create', 'products.edit', 'products.delete'] },
-  categories: { label: 'Categor\u00edas', color: 'bg-indigo-100 text-indigo-700', permissions: ['categories.view', 'categories.create', 'categories.edit', 'categories.delete'] },
+  categories: { label: 'Categorías', color: 'bg-indigo-100 text-indigo-700', permissions: ['categories.view', 'categories.create', 'categories.edit', 'categories.delete'] },
   inventory: { label: 'Inventario', color: 'bg-amber-100 text-amber-700', permissions: ['inventory.view', 'inventory.adjust'] },
   invoices: { label: 'Facturas', color: 'bg-purple-100 text-purple-700', permissions: ['invoices.view', 'invoices.void'] },
   customers: { label: 'Clientes', color: 'bg-pink-100 text-pink-700', permissions: ['customers.view', 'customers.create', 'customers.edit'] },
   tables: { label: 'Mesas', color: 'bg-orange-100 text-orange-700', permissions: ['tables.view', 'tables.open', 'tables.add_items', 'tables.pay', 'tables.add_notes'] },
   kitchen: { label: 'Cocina', color: 'bg-red-100 text-red-700', permissions: ['kitchen.view', 'kitchen.update_status'] },
+  promotions: { label: 'Promociones', color: 'bg-emerald-100 text-emerald-700', permissions: ['promotions.view', 'promotions.create', 'promotions.edit', 'promotions.delete', 'promotions.toggle'] },
   reports: { label: 'Reportes', color: 'bg-cyan-100 text-cyan-700', permissions: ['reports.view', 'reports.export'] },
   users: { label: 'Usuarios', color: 'bg-gray-100 text-gray-700', permissions: ['users.view', 'users.manage'] },
-  settings: { label: 'Configuraci\u00f3n', color: 'bg-slate-100 text-slate-700', permissions: ['settings.view', 'settings.edit'] },
+  settings: { label: 'Configuración', color: 'bg-slate-100 text-slate-700', permissions: ['settings.view', 'settings.edit'] },
 }
 
 const ROLE_MODULE_ACCESS: Record<string, string[]> = {
   ADMIN: Object.keys(MODULE_PERMISSIONS),
   CAJERO: ['pos', 'products', 'categories', 'customers', 'invoices', 'tables'],
-  SUPERVISOR: ['pos', 'products', 'categories', 'inventory', 'invoices', 'customers', 'tables', 'kitchen', 'reports'],
+  SUPERVISOR: ['pos', 'products', 'categories', 'inventory', 'invoices', 'customers', 'tables', 'kitchen', 'promotions', 'reports'],
   MESERO: ['tables', 'products', 'categories', 'customers'],
   COCINERO: ['kitchen'],
   INVENTARIO: ['products', 'categories', 'inventory'],
