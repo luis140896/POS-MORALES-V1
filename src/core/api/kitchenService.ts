@@ -17,6 +17,9 @@ export interface KitchenOrder {
   waiterName: string | null
   orderNotes: string | null
   createdAt: string
+  sequenceNumber?: number
+  isUrgent?: boolean
+  urgencyReason?: string | null
   items: KitchenItem[]
 }
 
@@ -24,5 +27,5 @@ export const kitchenService = {
   getPendingOrders: () => api.get<KitchenOrder[]>('/kitchen/orders'),
 
   updateItemStatus: (detailId: number, status: string) =>
-    api.put<KitchenItem>(`/kitchen/orders/${detailId}/status`, { status }),
+    api.put<KitchenItem>(`/kitchen/orders/items/${detailId}/status`, { status }),
 }

@@ -13,10 +13,10 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     strictPort: true,
-    allowedHosts: ['sell-wants-officials-experts.trycloudflare.com'],
+    allowedHosts: ['customized-jesse-intro-weed.trycloudflare.com'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true,
       },
     },

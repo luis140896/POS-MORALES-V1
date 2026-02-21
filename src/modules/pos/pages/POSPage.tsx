@@ -916,9 +916,9 @@ const POSPage = () => {
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
 
   const gridClasses = {
-    small: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
-    medium: 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-    large: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+    small: 'grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+    medium: 'grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+    large: 'grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
   }
 
   const handleCreateCustomer = async () => {

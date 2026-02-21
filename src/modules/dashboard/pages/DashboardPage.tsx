@@ -194,52 +194,65 @@ const DashboardPage = () => {
       <DateRangeFilter dateRange={dateRange} setDateRange={setDateRange} />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         {stats.map((stat) => (
           <div key={stat.label} className="card hover:scale-[1.02] cursor-pointer">
             <div className="flex items-start justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm text-gray-500 mb-1 truncate">{stat.label}</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-800 truncate">{stat.value}</p>
+                <p className="text-sm sm:text-base lg:text-lg xl:text-2xl font-bold text-gray-800 truncate">{stat.value}</p>
               </div>
-              <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center shadow-soft flex-shrink-0 ml-2`}>
-                <stat.icon className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center shadow-soft flex-shrink-0 ml-2`}>
+                <stat.icon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
               </div>
             </div>
-            <div className={`flex items-center gap-1 mt-3 text-sm ${stat.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-              {stat.isPositive ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+            <div className={`flex items-center gap-1 mt-3 text-xs sm:text-sm ${stat.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+              {stat.isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
               <span className="font-medium">{stat.change}</span>
-              <span className="text-gray-400">vs ayer</span>
+              <span className="text-gray-400 hidden sm:inline">vs ayer</span>
             </div>
           </div>
         ))}
       </div>
 
       {/* Alerts + Quick Actions - compact row */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3">
         <div className="flex flex-wrap gap-2">
           {outOfStock.length > 0 && (
-            <button onClick={() => navigate('/inventory')} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors border border-red-200">
-              <AlertTriangle size={13} />
-              {outOfStock.length} sin stock
+            <button onClick={() => navigate('/inventory')} className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors border border-red-200">
+              <AlertTriangle size={12} />
+              <span className="hidden xs:inline">{outOfStock.length} sin stock</span>
+              <span className="xs:hidden">{outOfStock.length}</span>
             </button>
           )}
           {lowStock.length > 0 && (
-            <button onClick={() => navigate('/inventory')} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200">
-              <AlertTriangle size={13} />
-              {lowStock.length} stock bajo
+            <button onClick={() => navigate('/inventory')} className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200">
+              <AlertTriangle size={12} />
+              <span className="hidden xs:inline">{lowStock.length} stock bajo</span>
+              <span className="xs:hidden">{lowStock.length}</span>
             </button>
           )}
           {lowStock.length === 0 && outOfStock.length === 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium border border-green-200">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" /> Sin alertas
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium border border-green-200">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" /> 
+              <span className="hidden xs:inline">Sin alertas</span>
+              <span className="xs:hidden">OK</span>
             </span>
           )}
         </div>
-        <div className="flex gap-2 ml-auto">
-          <button onClick={() => navigate('/pos')} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors">Nueva Venta</button>
-          <button onClick={() => navigate('/reports')} className="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors border border-gray-200">Reportes</button>
-          <button onClick={() => navigate('/inventory')} className="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors border border-gray-200">Inventario</button>
+        <div className="flex gap-1 sm:gap-2 lg:ml-auto">
+          <button onClick={() => navigate('/pos')} className="px-2 sm:px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors">
+            <span className="hidden xs:inline">Nueva Venta</span>
+            <span className="xs:hidden">+</span>
+          </button>
+          <button onClick={() => navigate('/reports')} className="px-2 sm:px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors border border-gray-200">
+            <span className="hidden xs:inline">Reportes</span>
+            <span className="xs:hidden">📊</span>
+          </button>
+          <button onClick={() => navigate('/inventory')} className="px-2 sm:px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors border border-gray-200">
+            <span className="hidden xs:inline">Inventario</span>
+            <span className="xs:hidden">📦</span>
+          </button>
         </div>
       </div>
 

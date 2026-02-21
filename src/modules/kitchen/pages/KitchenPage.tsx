@@ -152,21 +152,22 @@ const KitchenPage = () => {
       )}
 
       {/* Grid de pedidos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredOrders.map((order) => {
           const elapsed = getElapsedMinutes(order.createdAt)
-          const isUrgent = elapsed > 15
+          const isPriority = order.isUrgent === true
+          const isDelayed = elapsed > 15
 
           return (
             <div
               key={order.orderId}
               className={`bg-white rounded-2xl shadow-soft border-2 overflow-hidden transition-all ${
-                isUrgent ? 'border-red-300 animate-pulse-slow' : 'border-gray-100'
+                isPriority ? 'border-amber-300' : isDelayed ? 'border-red-300 animate-pulse-slow' : 'border-gray-100'
               }`}
             >
               {/* Cabecera del pedido */}
               <div className={`px-4 py-3 flex items-center justify-between ${
-                isUrgent ? 'bg-red-50' : 'bg-gray-50'
+                isPriority ? 'bg-amber-50' : isDelayed ? 'bg-red-50' : 'bg-gray-50'
               }`}>
                 <div>
                   <div className="flex items-center gap-2">
@@ -178,19 +179,32 @@ const KitchenPage = () => {
                     <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
                       {order.invoiceNumber}
                     </span>
+                    {order.sequenceNumber != null && (
+                      <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                        Lote #{order.sequenceNumber}
+                      </span>
+                    )}
+                    {isPriority && (
+                      <span className="text-xs font-semibold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+                        Prioritario
+                      </span>
+                    )}
                   </div>
                   {order.waiterName && (
                     <p className="text-xs text-gray-500 mt-0.5">Mesero: {order.waiterName}</p>
                   )}
+                  {isPriority && order.urgencyReason && (
+                    <p className="text-xs text-amber-800 mt-0.5">Motivo: {order.urgencyReason}</p>
+                  )}
                 </div>
                 <div className="text-right">
-                  <div className={`text-sm font-bold ${isUrgent ? 'text-red-600' : 'text-gray-600'}`}>
+                  <div className={`text-sm font-bold ${isPriority ? 'text-amber-700' : isDelayed ? 'text-red-600' : 'text-gray-600'}`}>
                     <Clock size={14} className="inline mr-1" />
                     {formatTime(order.createdAt)}
                   </div>
-                  <div className={`text-xs ${isUrgent ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                  <div className={`text-xs ${isPriority ? 'text-amber-700 font-semibold' : isDelayed ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
                     {elapsed} min
-                    {isUrgent && <AlertCircle size={12} className="inline ml-1" />}
+                    {(isPriority || isDelayed) && <AlertCircle size={12} className="inline ml-1" />}
                   </div>
                 </div>
               </div>
@@ -221,7 +235,7 @@ const KitchenPage = () => {
                             <span className="text-lg font-bold text-gray-800">
                               {Number(item.quantity)}x
                             </span>
-                            <span className="font-semibold text-gray-800 truncate">
+                            <span className="font-semibold text-gray-800 break-words whitespace-normal leading-snug">
                               {item.productName}
                             </span>
                           </div>

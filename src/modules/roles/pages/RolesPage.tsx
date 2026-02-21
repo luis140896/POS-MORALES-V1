@@ -17,6 +17,7 @@ type ModuleKey =
   | 'kitchen'
   | 'reports'
   | 'users'
+  | 'roles'
   | 'settings'
 
 const MODULE_PERMISSIONS: Record<ModuleKey, { label: string; color: string; permissions: string[] }> = {
@@ -30,6 +31,7 @@ const MODULE_PERMISSIONS: Record<ModuleKey, { label: string; color: string; perm
   kitchen: { label: 'Cocina', color: 'bg-red-100 text-red-700', permissions: ['kitchen.view', 'kitchen.update_status'] },
   reports: { label: 'Reportes', color: 'bg-cyan-100 text-cyan-700', permissions: ['reports.view', 'reports.export'] },
   users: { label: 'Usuarios', color: 'bg-gray-100 text-gray-700', permissions: ['users.view', 'users.manage'] },
+  roles: { label: 'Roles', color: 'bg-violet-100 text-violet-700', permissions: ['roles.view', 'roles.create', 'roles.edit', 'roles.delete'] },
   settings: { label: 'Configuración', color: 'bg-slate-100 text-slate-700', permissions: ['settings.view', 'settings.edit'] },
 }
 

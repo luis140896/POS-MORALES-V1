@@ -9,8 +9,10 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config) => {
+    const url = config.url || ''
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout')
     const token = localStorage.getItem('accessToken')
-    if (token) {
+    if (token && !isAuthEndpoint) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -22,8 +24,10 @@ axiosInstance.interceptors.response.use(
   (response) => response.data?.data ?? response.data,
   async (error) => {
     const originalRequest = error.config
+    const requestUrl = originalRequest?.url || ''
+    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh') || requestUrl.includes('/auth/logout')
 
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+    if (!isAuthEndpoint && (error.response?.status === 401 || error.response?.status === 403) && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true
 
       try {

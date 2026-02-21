@@ -64,33 +64,44 @@ const thermalCSS = `
       margin: 0;
       padding: 0;
       overflow: hidden;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
   }
   body {
     font-family: 'Courier New', monospace;
-    padding: 4px 6px;
-    width: 58mm;
-    max-width: 58mm;
-    font-size: 11px;
-    line-height: 1.3;
-    color: #000;
+    padding: 1mm 0.5mm;
+    width: 54mm;
+    max-width: 54mm;
+    font-size: 8px;
+    line-height: 1.2;
+    color: #000000 !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-weight: 600;
   }
   .header { text-align: center; margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 6px; }
-  .header h1 { margin: 0 0 2px; font-size: 14px; text-transform: uppercase; font-weight: bold; }
-  .header .invoice-num { font-size: 12px; font-weight: bold; }
-  .header p { margin: 1px 0; font-size: 10px; }
-  .pre-bill-banner { text-align: center; font-size: 13px; font-weight: bold; border: 2px dashed #000; padding: 4px; margin-bottom: 6px; text-transform: uppercase; }
+  .header h1 { margin: 0 0 2px; font-size: 14px; text-transform: uppercase; font-weight: 900; color: #000000 !important; }
+  .header .invoice-num { font-size: 12px; font-weight: 900; color: #000000 !important; }
+  .header p { margin: 1px 0; font-size: 10px; color: #000000 !important; font-weight: 600; }
+  .pre-bill-banner { text-align: center; font-size: 13px; font-weight: 900; border: 2px dashed #000; padding: 4px; margin-bottom: 6px; text-transform: uppercase; color: #000000 !important; }
   .info { margin-bottom: 6px; }
-  .info div { margin: 1px 0; font-size: 11px; }
+  .info div { margin: 1px 0; font-size: 11px; color: #000000 !important; font-weight: 600; }
   .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; margin: 4px 0; }
-  .item { display: flex; justify-content: space-between; margin: 2px 0; font-size: 11px; }
-  .item-notes { font-size: 9px; color: #444; margin-left: 8px; margin-bottom: 2px; }
-  .totals div { display: flex; justify-content: space-between; margin: 2px 0; font-size: 11px; }
-  .total-final { font-size: 14px; font-weight: bold; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
+  .item { display: flex; justify-content: space-between; margin: 1px 0; font-size: 9px; color: #000000 !important; font-weight: 600; padding-right: 1mm; }
+  .item span:first-child { flex: 1; margin-right: 1px; }
+  .item span:last-child { flex-shrink: 0; text-align: right; }
+  .item-notes { font-size: 9px; color: #000000 !important; margin-left: 8px; margin-bottom: 2px; font-weight: 500; }
+  .totals div { display: flex; justify-content: space-between; margin: 1px 0; font-size: 9px; color: #000000 !important; font-weight: 600; padding-right: 1mm; }
+  .totals div span:first-child { flex: 1; margin-right: 1px; }
+  .totals div span:last-child { flex-shrink: 0; text-align: right; }
+  .total-final { font-size: 12px; font-weight: 900; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; color: #000000 !important; }
   .payment-info { border-top: 1px dashed #000; margin-top: 6px; padding-top: 4px; }
-  .payment-info div { display: flex; justify-content: space-between; margin: 1px 0; }
-  .footer { text-align: center; margin-top: 8px; font-size: 9px; color: #444; border-top: 1px dashed #000; padding-top: 6px; }
-  .cut-line { text-align: center; margin-top: 10px; font-size: 9px; color: #ccc; }
+  .payment-info div { display: flex; justify-content: space-between; margin: 1px 0; color: #000000 !important; font-weight: 600; padding-right: 1mm; font-size: 9px; }
+  .payment-info div span:first-child { flex: 1; margin-right: 1px; }
+  .payment-info div span:last-child { flex-shrink: 0; text-align: right; }
+  .footer { text-align: center; margin-top: 8px; font-size: 9px; color: #000000 !important; border-top: 1px dashed #000; padding-top: 6px; font-weight: 600; }
+  .cut-line { text-align: center; margin-top: 10px; font-size: 9px; color: #000000 !important; }
 `
 
 export function printInvoice(inv: PrintableInvoice, options: PrintOptions = {}) {
@@ -99,11 +110,7 @@ export function printInvoice(inv: PrintableInvoice, options: PrintOptions = {}) 
   const { isPreBill = false } = options
 
   const itemsHtml = (inv.details || []).map((d) => {
-    let html = `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`
-    if (d.notes) {
-      html += `<div class="item-notes">↳ ${d.notes}</div>`
-    }
-    return html
+    return `<div class="item"><span>${d.quantity} x ${d.productName}</span><span>${formatCurrency(d.subtotal)}</span></div>`
   }).join('')
 
   const preBillBanner = isPreBill ? '<div class="pre-bill-banner">*** PRE-CUENTA ***</div>' : ''

@@ -445,7 +445,7 @@ const InventoryPage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
         <div className="card flex items-center gap-4">
           <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
             <Package className="w-6 h-6 text-primary-600" />

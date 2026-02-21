@@ -32,6 +32,8 @@ export interface AddTableItemsRequest {
     discountAmount?: number
     notes?: string
   }[]
+  priority?: boolean
+  priorityReason?: string
 }
 
 export interface PayTableRequest {
@@ -65,6 +67,8 @@ export const tableService = {
   removeItem: (id: number, detailId: number) => api.delete<TableSession>(`/tables/${id}/items/${detailId}`),
 
   payTable: (id: number, request: PayTableRequest) => api.post<Invoice>(`/tables/${id}/pay`, request),
+
+  releaseTable: (id: number) => api.post<RestaurantTable>(`/tables/${id}/release`),
 
   getActiveSession: (id: number) => api.get<TableSession>(`/tables/${id}/session`),
 

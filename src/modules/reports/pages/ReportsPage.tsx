@@ -49,6 +49,56 @@ const ReportsPage = () => {
     }
   }
 
+  // Calculate totals for visual cards
+  const [totals, setTotals] = useState<any>({ total: 0, subtotal: 0, tax: 0, discount: 0, serviceCharge: 0, cash: 0, card: 0, other: 0 })
+  
+  useEffect(() => {
+    const calculateTotals = async () => {
+      try {
+        const startDateTime = `${dateRange.start}T00:00:00`
+        const endDateTime = `${dateRange.end}T23:59:59`
+        
+        const invoices = (await invoiceService.getByDateRange(startDateTime, endDateTime).catch(() => [])) as any[]
+        const invoicesCompleted = invoices.filter((i) => i.status === 'COMPLETADA')
+        
+        const safeNumber = (v: any) => {
+          const n = Number(v)
+          return Number.isFinite(n) ? n : 0
+        }
+        
+        const calculatedTotals = invoicesCompleted.reduce(
+          (acc, inv) => {
+            const method = inv.paymentMethod
+            const total = safeNumber(inv.total)
+            const subtotal = safeNumber(inv.subtotal)
+            const tax = safeNumber(inv.taxAmount)
+            const discount = safeNumber(inv.discountAmount)
+            const serviceCharge = safeNumber(inv.serviceChargeAmount || 0)
+
+            acc.total += total
+            acc.subtotal += subtotal
+            acc.tax += tax
+            acc.discount += discount
+            acc.serviceCharge += serviceCharge
+
+            if (method === 'EFECTIVO') acc.cash += total
+            else if (['TRANSFERENCIA', 'TARJETA_CREDITO', 'TARJETA_DEBITO'].includes(method || '')) acc.card += total
+            else acc.other += total
+
+            return acc
+          },
+          { total: 0, subtotal: 0, tax: 0, discount: 0, serviceCharge: 0, cash: 0, card: 0, other: 0 }
+        )
+        
+        setTotals(calculatedTotals)
+      } catch (error) {
+        console.error('Error calculating totals:', error)
+      }
+    }
+    
+    calculateTotals()
+  }, [dateRange])
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value || 0)
 
@@ -113,11 +163,13 @@ const ReportsPage = () => {
           const subtotal = safeNumber((inv as any).subtotal)
           const tax = safeNumber((inv as any).taxAmount)
           const discount = safeNumber((inv as any).discountAmount)
+          const serviceCharge = safeNumber((inv as any).serviceChargeAmount || 0)
 
           acc.total += total
           acc.subtotal += subtotal
           acc.tax += tax
           acc.discount += discount
+          acc.serviceCharge += serviceCharge
 
           if (isCash(method)) acc.cash += total
           else if (isTransfer(method)) acc.card += total
@@ -125,7 +177,7 @@ const ReportsPage = () => {
 
           return acc
         },
-        { total: 0, subtotal: 0, tax: 0, discount: 0, cash: 0, card: 0, other: 0 }
+        { total: 0, subtotal: 0, tax: 0, discount: 0, serviceCharge: 0, cash: 0, card: 0, other: 0 }
       )
 
       // Helper: convert hex color to ARGB (without #)
@@ -198,17 +250,20 @@ const ReportsPage = () => {
         ['Costo Total', safeNumber((salesSummary as any).totalCost)],
         ['Ganancia Neta', safeNumber((salesSummary as any).grossProfit ?? (salesSummary as any).totalProfit)],
         ['Margen Ganancia %', safeNumber((salesSummary as any).profitMargin)],
+        ['Total Servicio (Propinas)', totals.serviceCharge],
+        ['Total Neto Dueño', totals.total - totals.serviceCharge],
         [],
         ['CIERRE DE CAJA'],
         ['Total Facturado', totals.total],
         ['Subtotal', totals.subtotal],
         ['Impuestos', totals.tax],
         ['Descuentos', totals.discount],
+        ['Total Servicio (Propinas)', totals.serviceCharge],
+        ['Total Neto Dueño', totals.total - totals.serviceCharge],
         [],
         ['DESGLOSE POR MÉTODO DE PAGO'],
         ['Total Efectivo', totals.cash],
         ['Total Transferencia', totals.card],
-        ['Otros Métodos', totals.other],
       ]
 
       const wsResumen = XLSX.utils.aoa_to_sheet(resumenAoA)
@@ -218,6 +273,7 @@ const ReportsPage = () => {
         { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
         { s: { r: 12, c: 0 }, e: { r: 12, c: 1 } },
         { s: { r: 18, c: 0 }, e: { r: 18, c: 1 } },
+        { s: { r: 20, c: 0 }, e: { r: 20, c: 1 } },
       ]
 
       // Apply styles to Resumen
@@ -232,15 +288,21 @@ const ReportsPage = () => {
       // Section headers
       if (wsResumen['A13']) wsResumen['A13'].s = sectionStyle
       if (wsResumen['A19']) wsResumen['A19'].s = sectionStyle
+      if (wsResumen['A21']) wsResumen['A21'].s = sectionStyle
 
       // Apply label and currency styles to data rows
-      const currencyRows = [5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 19, 20, 21]
+      const currencyRows = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 22]
       currencyRows.forEach(r => {
         const labelRef = `A${r + 1}`
         const valRef = `B${r + 1}`
         if (wsResumen[labelRef]) wsResumen[labelRef].s = labelStyle
         if (wsResumen[valRef] && typeof wsResumen[valRef].v === 'number') {
-          wsResumen[valRef].s = currencyStyle
+          // Transacciones y Margen Ganancia no van en formato moneda
+          if (r === 5 || r === 9) {
+            wsResumen[valRef].s = { ...labelStyle, alignment: { horizontal: 'right' } }
+          } else {
+            wsResumen[valRef].s = currencyStyle
+          }
         }
       })
 
@@ -285,27 +347,28 @@ const ReportsPage = () => {
       XLSX.utils.book_append_sheet(wb, wsInvoices, 'Facturas')
 
       // === MÉTODOS DE PAGO SHEET ===
-      if (paymentMethods.length > 0) {
-        const payHeaders = ['Método', 'Transacciones', 'Total', 'Porcentaje %']
-        const payData = paymentMethods.map((m) => [
-          getPaymentMethodLabel(m.paymentMethod),
-          safeNumber((m as any).count),
-          safeNumber((m as any).totalSales ?? (m as any).total),
-          safeNumber((m as any).percentage),
-        ])
-        const payAoA = [payHeaders, ...payData]
-        const wsPay = XLSX.utils.aoa_to_sheet(payAoA)
-        payHeaders.forEach((_, i) => {
-          const ref = XLSX.utils.encode_cell({ r: 0, c: i })
-          if (wsPay[ref]) wsPay[ref].s = headerStyle
-        })
-        payData.forEach((_, rowIdx) => {
-          const totalRef = XLSX.utils.encode_cell({ r: rowIdx + 1, c: 2 })
-          if (wsPay[totalRef]) wsPay[totalRef].s = currencyStyle
-        })
-        autoFitColumns(wsPay, payAoA)
-        XLSX.utils.book_append_sheet(wb, wsPay, 'MetodosPago')
-      }
+      // Comentado - No se exporta métodos de pago según solicitud
+      // if (paymentMethods.length > 0) {
+      //   const payHeaders = ['Método', 'Transacciones', 'Total', 'Porcentaje %']
+      //   const payData = paymentMethods.map((m) => [
+      //     getPaymentMethodLabel(m.paymentMethod),
+      //     safeNumber((m as any).count),
+      //     safeNumber((m as any).totalSales ?? (m as any).total),
+      //     safeNumber((m as any).percentage),
+      //   ])
+      //   const payAoA = [payHeaders, ...payData]
+      //   const wsPay = XLSX.utils.aoa_to_sheet(payAoA)
+      //   payHeaders.forEach((_, i) => {
+      //     const ref = XLSX.utils.encode_cell({ r: 0, c: i })
+      //     if (wsPay[ref]) wsPay[ref].s = headerStyle
+      //   })
+      //   payData.forEach((_, rowIdx) => {
+      //     const totalRef = XLSX.utils.encode_cell({ r: rowIdx + 1, c: 2 })
+      //     if (wsPay[totalRef]) wsPay[totalRef].s = currencyStyle
+      //   })
+      //   autoFitColumns(wsPay, payAoA)
+      //   XLSX.utils.book_append_sheet(wb, wsPay, 'MetodosPago')
+      // }
 
       // === TOP PRODUCTOS SHEET ===
       if (topProducts.length > 0) {
@@ -383,48 +446,72 @@ const ReportsPage = () => {
       ) : (
         <>
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
             <div className="card">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-green-500 to-green-600 flex items-center justify-center shadow-soft flex-shrink-0">
-                  <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r from-green-500 to-green-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-gray-500 truncate">Ventas Totales</p>
-                  <p className="text-base sm:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.totalSales || 0)}</p>
+                  <p className="text-sm sm:text-base lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.totalSales || 0)}</p>
                 </div>
               </div>
             </div>
             <div className="card">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center shadow-soft flex-shrink-0">
-                  <BarChart3 className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-gray-500 truncate">Transacciones</p>
-                  <p className="text-base sm:text-xl font-bold text-gray-800">{(salesSummary as any)?.salesCount || (salesSummary as any)?.totalTransactions || 0}</p>
+                  <p className="text-sm sm:text-base lg:text-xl font-bold text-gray-800">{(salesSummary as any)?.salesCount || (salesSummary as any)?.totalTransactions || 0}</p>
                 </div>
               </div>
             </div>
             <div className="card">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center shadow-soft flex-shrink-0">
-                  <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-gray-500 truncate">Ticket Promedio</p>
-                  <p className="text-base sm:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.averageTicket || 0)}</p>
+                  <p className="text-sm sm:text-base lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.averageTicket || 0)}</p>
                 </div>
               </div>
             </div>
             <div className="card">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center shadow-soft flex-shrink-0">
-                  <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-gray-500 truncate">Ganancia Neta</p>
-                  <p className="text-base sm:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.grossProfit || salesSummary?.totalProfit || 0)}</p>
+                  <p className="text-sm sm:text-base lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(salesSummary?.grossProfit || salesSummary?.totalProfit || 0)}</p>
+                </div>
+              </div>
+            </div>
+            {/* Servicio (Propinas) */}
+            <div className="card">
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Servicio (Propinas)</p>
+                  <p className="text-sm sm:text-base lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(totals?.serviceCharge || 0)}</p>
+                </div>
+              </div>
+            </div>
+            {/* Total Neto */}
+            <div className="card">
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 flex items-center justify-center shadow-soft flex-shrink-0">
+                  <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Total Neto</p>
+                  <p className="text-sm sm:text-base lg:text-xl font-bold text-gray-800 truncate">{formatCurrency((totals?.total || 0) - (totals?.serviceCharge || 0))}</p>
                 </div>
               </div>
             </div>
@@ -432,7 +519,7 @@ const ReportsPage = () => {
 
           {/* Inventory Summary */}
           {inventorySummary && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
               <div className="card">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-center shadow-soft">
@@ -469,7 +556,7 @@ const ReportsPage = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             {/* Top Products */}
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">🏆 Productos Más Vendidos</h3>
@@ -527,7 +614,7 @@ const ReportsPage = () => {
             {paymentMethods.length === 0 ? (
               <p className="text-gray-400 text-center py-4">Sin datos para el período</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {paymentMethods.map((method) => (
                   <div key={method.paymentMethod} className="p-4 bg-primary-50 rounded-xl">
                     <div className="flex items-center gap-3 mb-2">

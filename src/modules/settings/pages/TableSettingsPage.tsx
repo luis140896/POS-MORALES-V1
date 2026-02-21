@@ -173,7 +173,7 @@ const TableSettingsPage = () => {
             <Plus size={16} /> Agregar Zona
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {zones.map(zone => (
             <div key={zone.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
               <div className="flex items-center gap-3">
@@ -201,7 +201,7 @@ const TableSettingsPage = () => {
             <Plus size={16} /> Agregar Estado
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {statuses.map(status => (
             <div key={status.id} className={`flex items-center justify-between p-4 ${status.bgColor} ${status.borderColor} border rounded-xl`}>
               <div>

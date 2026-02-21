@@ -56,7 +56,19 @@ const Sidebar = ({ isOpen, isMobile = false, onToggle, onClose }: SidebarProps) 
 
     const permissions =
       ((user as any)?.permissions as string[] | undefined) || ((user as any)?.role?.permissions as string[] | undefined) || []
-    return item.requiredPermissions.every((p: string) => permissions.includes(p))
+    
+    // Normalize permission format: convert dots to colons for compatibility with backend format
+    // Backend uses "users:read" but frontend might use "users.manage"
+    const normalizedPermissions = permissions.map(p => p.replace(/:/g, '.'))
+    
+    // Check if user has wildcard or specific permission
+    return item.requiredPermissions.some((required: string) => {
+      const module = required.split('.')[0]
+      return normalizedPermissions.includes(required) || 
+             normalizedPermissions.includes(`${module}:*`) ||
+             normalizedPermissions.includes(`${module}.*`) ||
+             normalizedPermissions.includes('*')
+    })
   }
 
   // On mobile: always show labels when open, slide from left

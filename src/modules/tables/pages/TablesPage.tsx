@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import {
   Plus, X, Users, Clock, Search, Loader2, CreditCard, Banknote,
-  Minus, Trash2, ChevronRight, UtensilsCrossed, Coffee, AlertCircle, Printer, User, UserPlus, Edit2, Truck
+  Minus, Trash2, ChevronRight, UtensilsCrossed, Coffee, AlertCircle, Printer, User, UserPlus, Edit2, Truck, ShoppingCart
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '@/app/store'
@@ -12,6 +12,16 @@ import { categoryService } from '@/core/api/categoryService'
 import { customerService } from '@/core/api/customerService'
 import { invoiceService } from '@/core/api/invoiceService'
 import { RestaurantTable, TableSession, Product, Category, Customer, InvoiceDetail } from '@/types'
+
+const getHttpErrorMessage = (error: any): string => {
+  if (error?.response?.data?.message) {
+    return error.response.data.message
+  }
+  if (error?.message) {
+    return error.message
+  }
+  return 'Error desconocido'
+}
 
 const DEFAULT_ZONES = ['INTERIOR', 'TERRAZA', 'BAR', 'VIP']
 
@@ -73,8 +83,8 @@ const TablesPage = () => {
   const [loading, setLoading] = useState(true)
 
   // Dynamic configs
-  const [availableZones, setAvailableZones] = useState<string[]>(loadTableZones())
-  const [statusColors, setStatusColors] = useState(loadStatusColors())
+  const [availableZones] = useState<string[]>(loadTableZones())
+  const [statusColors] = useState(loadStatusColors())
 
   // Filters
   const [zoneFilter, setZoneFilter] = useState<string | null>(null)
@@ -87,6 +97,7 @@ const TablesPage = () => {
   // Modals
   const [showOpenModal, setShowOpenModal] = useState(false)
   const [showAddItemsModal, setShowAddItemsModal] = useState(false)
+  const [showMobileCart, setShowMobileCart] = useState(false)
   const [showPayModal, setShowPayModal] = useState(false)
   const [showCreateTableModal, setShowCreateTableModal] = useState(false)
 
@@ -98,6 +109,8 @@ const TablesPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [itemsToAdd, setItemsToAdd] = useState<{ product: Product; quantity: number; notes?: string }[]>([])
+  const [priorityKitchenBatch, setPriorityKitchenBatch] = useState(false)
+  const [priorityReason, setPriorityReason] = useState('')
 
   // Pay form
   const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TRANSFERENCIA'>('EFECTIVO')
@@ -146,11 +159,10 @@ const TablesPage = () => {
   const fetchProducts = useCallback(async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
-        productService.getAll(),
+        productService.getActive(),
         categoryService.getActive(),
       ])
-      const prodData = prodRes as any
-      setProducts(Array.isArray(prodData) ? prodData : prodData?.content || [])
+      setProducts(Array.isArray(prodRes) ? prodRes : [])
       setCategories(Array.isArray(catRes) ? catRes : [])
     } catch (err) {
       console.error('Error loading products/categories', err)
@@ -260,13 +272,17 @@ const TablesPage = () => {
           quantity: i.quantity,
           unitPrice: i.product.salePrice,
           notes: i.notes || undefined,
-        }))
+        })),
+        priority: priorityKitchenBatch,
+        priorityReason: priorityKitchenBatch ? (priorityReason.trim() || undefined) : undefined,
       }
       const res = await tableService.addItems(selectedTable.id, request)
       setActiveSession(res as TableSession)
       toast.success(`${itemsToAdd.length} producto(s) agregado(s)`)
       setShowAddItemsModal(false)
       setItemsToAdd([])
+      setPriorityKitchenBatch(false)
+      setPriorityReason('')
       setSearchTerm('')
       await fetchTables()
     } catch (err: any) {
@@ -346,8 +362,6 @@ const TablesPage = () => {
     if (!selectedTable || !activeSession) return
     setProcessing(true)
     try {
-      const baseTotal = activeSession.total || 0
-      const svcAmount = includeServiceCharge ? baseTotal * 0.10 : 0
       const deliveryAmount = includeDelivery ? deliveryCharge : 0
       const request: PayTableRequest = {
         paymentMethod,
@@ -502,15 +516,31 @@ const TablesPage = () => {
     return true
   }).sort((a, b) => a.tableNumber - b.tableNumber)
 
+  // Helper: Get all child category IDs recursively (same logic as POSPage)
+  const getChildCategoryIds = (parentId: number): number[] => {
+    const children = categories.filter(c => c.parentId === parentId)
+    if (children.length === 0) return []
+    const childIds = children.map(c => c.id)
+    const grandchildIds = children.flatMap(c => getChildCategoryIds(c.id))
+    return [...childIds, ...grandchildIds]
+  }
+
   const filteredProducts = products.filter(p => {
-    if (!p.isActive) return false
-    if (selectedCategory && p.categoryId !== selectedCategory) return false
+    const productCategoryId = p.categoryId || (p.category as any)?.id
+    
+    if (selectedCategory !== null) {
+      // Include products from selected category and all its children (recursive)
+      const childIds = getChildCategoryIds(selectedCategory)
+      const validIds = [selectedCategory, ...childIds]
+      if (!validIds.includes(productCategoryId)) return false
+    }
+    
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       return p.name.toLowerCase().includes(term) || p.code?.toLowerCase().includes(term)
     }
     return true
-  })
+  }).sort((a, b) => a.name.localeCompare(b.name))
 
   const addProductToList = (product: Product) => {
     setItemsToAdd(prev => {
@@ -612,7 +642,7 @@ const TablesPage = () => {
 
         {/* Tables Grid */}
         <div className="lg:flex-1 lg:overflow-y-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {filteredTables.map(table => {
               const colors = statusColors[table.status] || statusColors.DISPONIBLE || DEFAULT_STATUS_COLORS.DISPONIBLE
               const isSelected = selectedTable?.id === table.id
@@ -771,7 +801,12 @@ const TablesPage = () => {
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold text-gray-700">Pedido</h4>
                       <button
-                        onClick={() => { setShowAddItemsModal(true); setItemsToAdd([]) }}
+                        onClick={() => {
+                          setShowAddItemsModal(true)
+                          setItemsToAdd([])
+                          setPriorityKitchenBatch(false)
+                          setPriorityReason('')
+                        }}
                         className="flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors text-sm font-medium"
                       >
                         <Plus size={14} />
@@ -813,6 +848,26 @@ const TablesPage = () => {
                       <div className="text-center py-6 text-gray-400">
                         <AlertCircle size={24} className="mx-auto mb-2 opacity-50" />
                         <p className="text-sm">Sin productos aún</p>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('¿Liberar esta mesa? La sesión se cerrará sin cobrar.')) return
+                            try {
+                              setProcessing(true)
+                              await tableService.releaseTable(selectedTable.id)
+                              toast.success('Mesa liberada exitosamente')
+                              await fetchTables()
+                              setSelectedTable(null)
+                            } catch (err: any) {
+                              const msg = getHttpErrorMessage(err)
+                              toast.error(msg)
+                            } finally {
+                              setProcessing(false)
+                            }
+                          }}
+                          className="mt-3 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                        >
+                          Liberar Mesa
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1007,19 +1062,29 @@ const TablesPage = () => {
       {/* Add Items Modal */}
       {showAddItemsModal && (
         <div className="modal-overlay">
-          <div className="modal-content p-0 sm:max-w-4xl max-h-[95vh] sm:max-h-[85vh] flex flex-col animate-scale-in">
-            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
+          <div className="fixed inset-4 sm:inset-8 lg:inset-12 bg-white rounded-2xl shadow-2xl flex flex-col animate-scale-in z-50 max-w-6xl mx-auto">
+            <div className="p-3 sm:p-4 border-b flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-bold text-gray-800">
                 Agregar Productos - Mesa #{selectedTable?.tableNumber}
               </h3>
-              <button onClick={() => setShowAddItemsModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+              <button
+                onClick={() => {
+                  setShowAddItemsModal(false)
+                  setShowMobileCart(false)
+                  setPriorityKitchenBatch(false)
+                  setPriorityReason('')
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
                 <X size={24} />
               </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row flex-1 min-h-0 overflow-hidden">
-              {/* Products list */}
-              <div className="flex-1 flex flex-col sm:border-r min-h-0 overflow-hidden">
+            <div className="flex flex-1 min-h-0 overflow-hidden relative">
+              {/* Products list - Full width on mobile, left side on desktop */}
+              <div className={`${
+                showMobileCart ? 'hidden' : 'flex'
+              } lg:flex flex-1 flex-col min-h-0 overflow-hidden`}>
                 <div className="p-3 sm:p-4 border-b flex-shrink-0">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -1032,100 +1097,167 @@ const TablesPage = () => {
                       autoFocus
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mt-3">
-                    <button
-                      onClick={() => setSelectedCategory(null)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        !selectedCategory ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Todos
-                    </button>
-                    {categories.map(cat => (
+                  <div className="overflow-x-auto mt-3 -mx-3 px-3 sm:-mx-4 sm:px-4">
+                    <div className="grid grid-flow-col auto-cols-max grid-rows-2 gap-2 pb-1">
                       <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedCategory === cat.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        onClick={() => setSelectedCategory(null)}
+                        className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                          !selectedCategory ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        {cat.name}
+                        Todos
+                      </button>
+                      {categories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
+                          className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                            selectedCategory === cat.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    {filteredProducts.map(product => (
+                      <button
+                        key={product.id}
+                        onClick={() => addProductToList(product)}
+                        className="flex items-center justify-between p-3 rounded-xl hover:bg-primary-50 active:scale-95 transition-all text-left border border-gray-100 hover:border-primary-200"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 truncate">{product.name}</p>
+                          <p className="text-xs text-gray-500">{product.code}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-primary-600 ml-3 flex-shrink-0">
+                          {formatCurrency(product.salePrice)}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1">
-                  {filteredProducts.map(product => (
-                    <button
-                      key={product.id}
-                      onClick={() => addProductToList(product)}
-                      className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-primary-50 transition-colors text-left"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{product.name}</p>
-                        <p className="text-xs text-gray-500">{product.code}</p>
-                      </div>
-                      <span className="text-sm font-semibold text-primary-600 ml-3 flex-shrink-0">
-                        {formatCurrency(product.salePrice)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
               </div>
 
-              {/* Cart */}
-              <div className="w-full sm:w-72 flex flex-col border-t sm:border-t-0 min-h-0">
-                <div className="p-3 sm:p-4 border-b flex-shrink-0">
-                  <h4 className="font-semibold text-gray-700">
-                    Por agregar ({itemsToAdd.length})
-                  </h4>
+              {/* Mobile Cart FAB */}
+              <button
+                onClick={() => setShowMobileCart(true)}
+                className="lg:hidden fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <ShoppingCart size={24} />
+                {itemsToAdd.length > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[24px] h-[24px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5">
+                    {itemsToAdd.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Mobile Cart Backdrop */}
+              {showMobileCart && (
+                <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileCart(false)} />
+              )}
+
+              {/* Cart Panel - Slides in on mobile, fixed on desktop */}
+              <div className={`${
+                showMobileCart ? 'translate-x-0' : 'translate-x-full'
+              } lg:translate-x-0
+                fixed lg:relative right-0 top-0 h-full w-full sm:w-96 z-50 lg:z-auto
+                lg:w-96 lg:border-l flex-shrink-0 bg-white flex flex-col min-w-0
+                transition-transform duration-300 lg:transition-none
+              `}>
+                <div className="p-4 border-b flex-shrink-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+                      <ShoppingCart size={18} />
+                      Por agregar ({itemsToAdd.length})
+                    </h4>
+                    <button
+                      onClick={() => setShowMobileCart(false)}
+                      className="lg:hidden text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={priorityKitchenBatch}
+                        onChange={(e) => {
+                          setPriorityKitchenBatch(e.target.checked)
+                          if (!e.target.checked) {
+                            setPriorityReason('')
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm font-semibold text-amber-800 flex items-center gap-1">
+                        <AlertCircle size={14} /> Marcar como prioritario en cocina
+                      </span>
+                    </label>
+                    {priorityKitchenBatch && (
+                      <input
+                        type="text"
+                        value={priorityReason}
+                        onChange={(e) => setPriorityReason(e.target.value)}
+                        placeholder="Motivo (opcional): ejemplo cliente apurado"
+                        className="mt-2 w-full text-xs px-2.5 py-2 border border-amber-200 rounded-lg focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1.5">
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
                   {itemsToAdd.map(item => (
-                    <div key={item.product.id} className="p-2.5 bg-gray-50 rounded-xl space-y-1.5">
-                      <div className="flex items-center gap-2">
+                    <div key={item.product.id} className="p-3 bg-gray-50 rounded-xl space-y-2">
+                      <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.product.name}</p>
                           <p className="text-xs text-gray-500">{formatCurrency(item.product.salePrice * item.quantity)}</p>
                         </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => updateItemQuantity(item.product.id, -1)}
-                          className="p-1 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span className="text-sm font-bold w-6 text-center">{item.quantity}</span>
-                        <button
-                          onClick={() => updateItemQuantity(item.product.id, 1)}
-                          className="p-1 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          <Plus size={14} />
-                        </button>
-                        <button
-                          onClick={() => removeItemFromList(item.product.id)}
-                          className="p-1 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-500 ml-1 transition-colors"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => updateItemQuantity(item.product.id, -1)}
+                            className="w-7 h-7 rounded-lg bg-white hover:bg-gray-100 flex items-center justify-center transition-colors"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="text-sm font-bold w-8 text-center">{item.quantity}</span>
+                          <button
+                            onClick={() => updateItemQuantity(item.product.id, 1)}
+                            className="w-7 h-7 rounded-lg bg-white hover:bg-gray-100 flex items-center justify-center transition-colors"
+                          >
+                            <Plus size={14} />
+                          </button>
+                          <button
+                            onClick={() => removeItemFromList(item.product.id)}
+                            className="w-7 h-7 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-500 ml-1 transition-colors flex items-center justify-center"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                       <input
                         type="text"
                         placeholder="Ej: sin cebolla, salsa extra..."
                         value={item.notes || ''}
                         onChange={(e) => setItemsToAdd(prev => prev.map(i => i.product.id === item.product.id ? { ...i, notes: e.target.value } : i))}
-                        className="w-full text-xs px-2 py-1 border border-gray-200 rounded-lg focus:border-primary-400 focus:ring-1 focus:ring-primary-200 placeholder-gray-300"
+                        className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg focus:border-primary-400 focus:ring-1 focus:ring-primary-200 placeholder-gray-300"
                       />
                     </div>
                   ))}
                   {itemsToAdd.length === 0 && (
-                    <p className="text-center text-sm text-gray-400 py-8">
-                      Selecciona productos de la lista
-                    </p>
+                    <div className="h-full flex items-center justify-center text-gray-400 py-12">
+                      <div className="text-center">
+                        <ShoppingCart size={32} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">Selecciona productos</p>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className="p-3 sm:p-4 border-t flex-shrink-0">
+                <div className="p-4 border-t flex-shrink-0">
                   <button
                     onClick={handleAddItems}
                     disabled={processing || itemsToAdd.length === 0}
